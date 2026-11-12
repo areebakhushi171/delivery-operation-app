@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1001365529758",
+    "project_id": "delivery-operations-companion",
+    "storage_bucket": "delivery-operations-companion.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1001365529758:android:8f50d617adb659ad0c078f",
+        "android_client_info": {
+          "package_name": "com.example.delivery_companion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDY5PxeMO7bbUCH4WQNOrI-Du3R6eyvnRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
