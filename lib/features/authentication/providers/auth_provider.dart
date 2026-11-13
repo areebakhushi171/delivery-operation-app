@@ -1,7 +1,13 @@
+import 'dart:io';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../core/config/app_config.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/data/data.dart';
 import '../../../core/providers/base_provider.dart';
+import '../../../core/services/cloudinary_service.dart';
 import '../../../core/storage/local_storage.dart';
-import '../../../core/constants/app_constants.dart';
 
 enum AuthStatus { unknown, signedOut, signedIn }
 
@@ -83,6 +89,56 @@ class AuthProvider extends BaseProvider {
     _status = AuthStatus.signedIn;
     notifyListeners();
     return true;
+  }
+
+  Future<bool> updateProfilePhoto(File file) async {
+    final u = _user;
+    if (u == null) return false;
+    final ok = await guard(() async {
+      final secureUrl = await CloudinaryService.uploadImage(
+        file: file,
+        folder: 'delivery-operations/profile-images',
+      );
+      if (AppConfig.useFirebase) {
+        await FirebaseFirestore.instance.collection('users').doc(u.uid).set({
+          'photoUrl': secureUrl,
+        }, SetOptions(merge: true));
+      }
+      _user = AppUser(
+        uid: u.uid,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        staffId: u.staffId,
+        photoUrl: secureUrl,
+      );
+      notifyListeners();
+      return true;
+    });
+    return ok ?? false;
+  }
+
+  Future<bool> removeProfilePhoto() async {
+    final u = _user;
+    if (u == null) return false;
+    final ok = await guard(() async {
+      if (AppConfig.useFirebase) {
+        await FirebaseFirestore.instance.collection('users').doc(u.uid).set({
+          'photoUrl': null,
+        }, SetOptions(merge: true));
+      }
+      _user = AppUser(
+        uid: u.uid,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        staffId: u.staffId,
+        photoUrl: null,
+      );
+      notifyListeners();
+      return true;
+    });
+    return ok ?? false;
   }
 
   Future<bool> sendPasswordReset(String email) async {

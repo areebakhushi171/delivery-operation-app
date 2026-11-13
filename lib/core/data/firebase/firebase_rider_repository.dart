@@ -93,4 +93,8 @@ class FirebaseRiderRepository implements RiderRepository {
   @override
   Future<void> updateProfile(String riderId, {required String name, required String phone}) =>
       _riders.doc(riderId).set({'name': name, 'phone': phone}, SetOptions(merge: true));
+
+  @override
+  Future<void> updateProfilePhoto(String riderId, String? photoUrl) =>
+      _riders.doc(riderId).set({'photoUrl': photoUrl}, SetOptions(merge: true));
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:geolocator/geolocator.dart';
@@ -6,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/data/data.dart';
 import '../../../../core/providers/base_provider.dart';
+import '../../../../core/services/cloudinary_service.dart';
 import '../../../../core/services/location_service.dart';
 
 /// Rider document + duty status + (real-device mode only) GPS telemetry.
@@ -57,6 +59,30 @@ class RiderProfileProvider extends BaseProvider {
     if (id == null) return false;
     final ok = await guard(() async {
       await _repo.updateProfile(id, name: name.trim(), phone: phone.trim());
+      return true;
+    });
+    return ok ?? false;
+  }
+
+  Future<bool> updateProfilePhoto(File file) async {
+    final id = _riderId;
+    if (id == null) return false;
+    final ok = await guard(() async {
+      final secureUrl = await CloudinaryService.uploadImage(
+        file: file,
+        folder: 'delivery-operations/profile-images',
+      );
+      await _repo.updateProfilePhoto(id, secureUrl);
+      return true;
+    });
+    return ok ?? false;
+  }
+
+  Future<bool> removeProfilePhoto() async {
+    final id = _riderId;
+    if (id == null) return false;
+    final ok = await guard(() async {
+      await _repo.updateProfilePhoto(id, null);
       return true;
     });
     return ok ?? false;

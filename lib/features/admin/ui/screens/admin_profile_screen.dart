@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/core.dart';
@@ -23,6 +27,191 @@ class AdminProfileScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _showPhotoOptions(BuildContext context, AppUser? user) async {
+    final hasPhoto = user?.photoUrl != null && user!.photoUrl!.isNotEmpty;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Profile Picture', style: context.text.titleMedium),
+              SizedBox(height: AppSpacing.sm),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.photo_library_outlined, color: context.scheme.primary),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndCropImage(context, ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.photo_camera_outlined, color: context.scheme.primary),
+                title: const Text('Take a Photo'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndCropImage(context, ImageSource.camera);
+                },
+              ),
+              if (hasPhoto)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  title: const Text('Remove Profile Picture', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmRemovePhoto(context);
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndCropImage(BuildContext context, ImageSource source) async {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, maxWidth: 1600, imageQuality: 95);
+      if (picked == null || !context.mounted) return;
+
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Profile Picture',
+            toolbarColor: primaryColor,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: 'Crop Profile Picture',
+          ),
+        ],
+      );
+
+      if (cropped == null || !context.mounted) return;
+
+      if (!context.mounted) return;
+      await _showPreviewAndUpload(context, File(cropped.path));
+    } catch (e) {
+      if (!context.mounted) return;
+      context.showMessage('Failed to process image: $e', isError: true);
+    }
+  }
+
+  Future<void> _showPreviewAndUpload(BuildContext context, File imageFile) async {
+    if (!context.mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Preview Profile Picture'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(
+              child: Image.file(
+                imageFile,
+                width: 140.w,
+                height: 140.w,
+                fit: BoxFit.cover,
+              ),
+            ),
+            SizedBox(height: AppSpacing.md),
+            const Text('Would you like to upload this picture as your new profile photo?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Upload'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            SizedBox(width: AppSpacing.md),
+            const Expanded(child: Text('Uploading profile picture...')),
+          ],
+        ),
+      ),
+    );
+
+    final authProv = context.read<AuthProvider>();
+    final success = await authProv.updateProfilePhoto(imageFile);
+
+    if (!context.mounted) return;
+    Navigator.pop(context); // Dismiss loading dialog
+
+    if (success) {
+      context.showMessage('Profile picture updated successfully!', isSuccess: true);
+    } else {
+      context.showMessage(authProv.error ?? 'Failed to upload profile picture.', isError: true);
+    }
+  }
+
+  Future<void> _confirmRemovePhoto(BuildContext context) async {
+    if (!context.mounted) return;
+    final ok = await CommonConfirmationDialog.show(
+      context,
+      title: 'Remove Profile Picture?',
+      message: 'Your profile picture will be removed and replaced with your initials.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    );
+
+    if (!ok || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            SizedBox(width: AppSpacing.md),
+            const Expanded(child: Text('Removing profile picture...')),
+          ],
+        ),
+      ),
+    );
+
+    final authProv = context.read<AuthProvider>();
+    final success = await authProv.removeProfilePhoto();
+
+    if (!context.mounted) return;
+    Navigator.pop(context); // Dismiss loading dialog
+
+    if (success) {
+      context.showMessage('Profile picture removed.', isSuccess: true);
+    } else {
+      context.showMessage(authProv.error ?? 'Failed to remove profile picture.', isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -41,13 +230,12 @@ class AdminProfileScreen extends StatelessWidget {
           CommonCard(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 36.r,
-                  backgroundColor: primaryColor,
-                  child: Text(
-                    (user?.name.isNotEmpty ?? false) ? user!.name[0].toUpperCase() : 'A',
-                    style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
+                CommonProfileAvatar(
+                  name: user?.name ?? 'Dispatcher Admin',
+                  photoUrl: user?.photoUrl,
+                  size: 72,
+                  showEditBadge: true,
+                  onTap: () => _showPhotoOptions(context, user),
                 ),
                 SizedBox(height: AppSpacing.sm),
                 Text(user?.name ?? 'Dispatcher Admin', style: context.text.titleLarge),

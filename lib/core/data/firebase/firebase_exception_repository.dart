@@ -1,17 +1,16 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../services/cloudinary_service.dart';
 import '../../utils/utils.dart';
 import '../models/models.dart';
 import '../repositories/repositories.dart';
 import 'firestore_helpers.dart';
 
 class FirebaseExceptionRepository implements ExceptionRepository {
-  FirebaseExceptionRepository(FirebaseFirestore db, this._storage) : _h = FirestoreHelpers(db);
+  FirebaseExceptionRepository(FirebaseFirestore db) : _h = FirestoreHelpers(db);
   final FirestoreHelpers _h;
-  final FirebaseStorage _storage;
 
   FirebaseFirestore get _db => _h.db;
 
@@ -32,9 +31,11 @@ class FirebaseExceptionRepository implements ExceptionRepository {
     var ex = exception;
     final path = exception.photoPath;
     if (path != null && path.isNotEmpty && !path.startsWith('http')) {
-      final ref = _storage.ref('delivery_exceptions/${exception.id}/photo.jpg');
-      await ref.putFile(File(path), SettableMetadata(contentType: 'image/jpeg'));
-      ex = exception.copyWith(photoPath: await ref.getDownloadURL());
+      final secureUrl = await CloudinaryService.uploadImage(
+        file: File(path),
+        folder: 'delivery-operations/delivery-issues',
+      );
+      ex = exception.copyWith(photoPath: secureUrl);
     }
     await _db.runTransaction((tx) async {
       final exRef = _h.exceptions.doc(ex.id);

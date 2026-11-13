@@ -26,6 +26,7 @@ class Rider {
     this.etaMinutes,
     this.lastUpdated,
     this.telemetrySource = 'none',
+    this.photoUrl,
   });
 
   final String id;
@@ -49,6 +50,7 @@ class Rider {
 
   /// 'device' = real GPS from the rider's phone, 'seed' = demo data, 'none'.
   final String telemetrySource;
+  final String? photoUrl;
 
   bool get isOnDuty => dutyStatus == DutyStatus.onDuty;
   bool get hasLocation => lat != null && lng != null;
@@ -76,6 +78,8 @@ class Rider {
     bool clearCurrent = false,
     DateTime? lastUpdated,
     String? telemetrySource,
+    String? photoUrl,
+    bool clearPhoto = false,
   }) {
     return Rider(
       id: id,
@@ -97,6 +101,7 @@ class Rider {
       etaMinutes: clearCurrent ? null : (etaMinutes ?? this.etaMinutes),
       lastUpdated: lastUpdated ?? this.lastUpdated,
       telemetrySource: telemetrySource ?? this.telemetrySource,
+      photoUrl: clearPhoto ? null : (photoUrl ?? this.photoUrl),
     );
   }
 
@@ -120,6 +125,7 @@ class Rider {
         'etaMinutes': etaMinutes,
         'lastUpdated': lastUpdated?.millisecondsSinceEpoch,
         'telemetrySource': telemetrySource,
+        'photoUrl': photoUrl,
       };
 
   factory Rider.fromMap(Map<String, dynamic> m) => Rider(
@@ -142,5 +148,6 @@ class Rider {
         etaMinutes: (m['etaMinutes'] as num?)?.toInt(),
         lastUpdated: _dt(m['lastUpdated']),
         telemetrySource: m['telemetrySource'] as String? ?? 'none',
+        photoUrl: m['photoUrl'] as String?,
       );
 }

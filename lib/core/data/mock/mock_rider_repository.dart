@@ -44,4 +44,8 @@ class MockRiderRepository implements RiderRepository {
   @override
   Future<void> updateProfile(String riderId, {required String name, required String phone}) async =>
       _s.putRider(_s.requireRider(riderId).copyWith(name: name, phone: phone));
+
+  @override
+  Future<void> updateProfilePhoto(String riderId, String? photoUrl) async =>
+      _s.putRider(_s.requireRider(riderId).copyWith(photoUrl: photoUrl, clearPhoto: photoUrl == null));
 }

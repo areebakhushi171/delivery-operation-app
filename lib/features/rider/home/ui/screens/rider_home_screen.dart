@@ -35,7 +35,12 @@ class RiderHomeScreen extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    CommonProfileAvatar(name: user?.name ?? '', onDark: true),
+                    CommonProfileAvatar(
+                      name: user?.name ?? '',
+                      photoUrl: profile.rider?.photoUrl ?? user?.photoUrl,
+                      size: 40,
+                      onDark: true,
+                    ),
                     SizedBox(width: AppSpacing.sm + 4),
                     Expanded(
                       child: Column(

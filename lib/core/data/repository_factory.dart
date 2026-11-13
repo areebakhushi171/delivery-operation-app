@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 import '../config/app_config.dart';
 import '../storage/local_storage.dart';
@@ -24,12 +23,11 @@ class RepositoryFactory {
   static AppRepositories create(LocalStorage storage) {
     if (AppConfig.useFirebase) {
       final db = FirebaseFirestore.instance;
-      final fs = FirebaseStorage.instance;
       return AppRepositories(
         auth: FirebaseAuthRepository(FirebaseAuth.instance, db),
-        orders: FirebaseOrderRepository(db, fs),
+        orders: FirebaseOrderRepository(db),
         riders: FirebaseRiderRepository(db),
-        exceptions: FirebaseExceptionRepository(db, fs),
+        exceptions: FirebaseExceptionRepository(db),
         notifications: FirebaseNotificationRepository(db),
       );
     }

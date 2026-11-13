@@ -2,17 +2,16 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../services/cloudinary_service.dart';
 import '../../utils/utils.dart';
 import '../models/models.dart';
 import '../repositories/repositories.dart';
 import 'firestore_helpers.dart';
 
 class FirebaseOrderRepository implements OrderRepository {
-  FirebaseOrderRepository(FirebaseFirestore db, this._storage) : _h = FirestoreHelpers(db);
+  FirebaseOrderRepository(FirebaseFirestore db) : _h = FirestoreHelpers(db);
   final FirestoreHelpers _h;
-  final FirebaseStorage _storage;
 
   FirebaseFirestore get _db => _h.db;
 
@@ -136,9 +135,11 @@ class FirebaseOrderRepository implements OrderRepository {
     if (proof.photoPath.isEmpty) throw const AppException('A delivery photo is required.');
     var toSave = proof;
     if (!proof.photoPath.startsWith('http')) {
-      final ref = _storage.ref('delivery_proofs/${proof.orderId}/photo.jpg');
-      await ref.putFile(File(proof.photoPath), SettableMetadata(contentType: 'image/jpeg'));
-      toSave = proof.copyWith(photoPath: await ref.getDownloadURL());
+      final secureUrl = await CloudinaryService.uploadImage(
+        file: File(proof.photoPath),
+        folder: 'delivery-operations/proof-of-delivery',
+      );
+      toSave = proof.copyWith(photoPath: secureUrl);
     }
     await _db.runTransaction((tx) async {
       final ref = _h.orders.doc(proof.orderId);

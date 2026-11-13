@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../../core/core.dart';
@@ -79,13 +83,189 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     if (ok && mounted) await context.read<AuthProvider>().signOut();
   }
 
-  void _showQueue() {
-    showModalBottomSheet<void>(
+  Future<void> _showPhotoOptions(BuildContext context, Rider rider) async {
+    final hasPhoto = rider.photoUrl != null && rider.photoUrl!.isNotEmpty;
+    await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => const _QueueSheet(),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Profile Picture', style: context.text.titleMedium),
+              SizedBox(height: AppSpacing.sm),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.photo_library_outlined, color: context.scheme.primary),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndCropImage(context, ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.photo_camera_outlined, color: context.scheme.primary),
+                title: const Text('Take a Photo'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndCropImage(context, ImageSource.camera);
+                },
+              ),
+              if (hasPhoto)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  title: const Text('Remove Profile Picture', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _confirmRemovePhoto();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
     );
+  }
+
+  Future<void> _pickAndCropImage(BuildContext context, ImageSource source) async {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, maxWidth: 1600, imageQuality: 95);
+      if (picked == null || !mounted) return;
+
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Profile Picture',
+            toolbarColor: primaryColor,
+            toolbarWidgetColor: Colors.white,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: 'Crop Profile Picture',
+          ),
+        ],
+      );
+
+      if (cropped == null || !mounted) return;
+
+      if (!mounted) return;
+      await _showPreviewAndUpload(File(cropped.path));
+    } catch (e) {
+      if (!mounted) return;
+      context.showMessage('Failed to process image: $e', isError: true);
+    }
+  }
+
+  Future<void> _showPreviewAndUpload(File imageFile) async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Preview Profile Picture'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(
+              child: Image.file(
+                imageFile,
+                width: 140.w,
+                height: 140.w,
+                fit: BoxFit.cover,
+              ),
+            ),
+            SizedBox(height: AppSpacing.md),
+            const Text('Would you like to upload this picture as your new profile photo?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Upload'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            SizedBox(width: AppSpacing.md),
+            const Expanded(child: Text('Uploading profile picture...')),
+          ],
+        ),
+      ),
+    );
+
+    final profileProv = context.read<RiderProfileProvider>();
+    final success = await profileProv.updateProfilePhoto(imageFile);
+
+    if (!mounted) return;
+    Navigator.pop(context); // Dismiss loading dialog
+
+    if (success) {
+      context.showMessage('Profile picture updated successfully!', isSuccess: true);
+    } else {
+      context.showMessage(profileProv.error ?? 'Failed to upload profile picture.', isError: true);
+    }
+  }
+
+  Future<void> _confirmRemovePhoto() async {
+    if (!mounted) return;
+    final ok = await CommonConfirmationDialog.show(
+      context,
+      title: 'Remove Profile Picture?',
+      message: 'Your profile picture will be removed and replaced with your initials.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    );
+
+    if (!ok || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            SizedBox(width: AppSpacing.md),
+            const Expanded(child: Text('Removing profile picture...')),
+          ],
+        ),
+      ),
+    );
+
+    final profileProv = context.read<RiderProfileProvider>();
+    final success = await profileProv.removeProfilePhoto();
+
+    if (!mounted) return;
+    Navigator.pop(context); // Dismiss loading dialog
+
+    if (success) {
+      context.showMessage('Profile picture removed.', isSuccess: true);
+    } else {
+      context.showMessage(profileProv.error ?? 'Failed to remove profile picture.', isError: true);
+    }
   }
 
   @override
@@ -94,7 +274,6 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
     final orders = context.watch<RiderOrdersProvider>();
     final prefs = context.watch<PreferencesProvider>();
     final theme = context.watch<ThemeProvider>();
-    final sync = context.watch<SyncProvider>();
     final user = context.watch<AuthProvider>().user;
 
     final displayRider = profile.rider ??
@@ -124,7 +303,15 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, KeyboardUtils.bottomInset(context)),
                 children: [
-                  Center(child: CommonProfileAvatar(name: displayRider.name, size: 84)),
+                  Center(
+                    child: CommonProfileAvatar(
+                      name: displayRider.name,
+                      photoUrl: displayRider.photoUrl,
+                      size: 84,
+                      showEditBadge: true,
+                      onTap: () => _showPhotoOptions(context, displayRider),
+                    ),
+                  ),
                   SizedBox(height: AppSpacing.sm),
                   Center(child: Text(displayRider.name, style: context.text.titleLarge)),
                   Center(child: Text('Rider ID: #${displayRider.staffId}', style: context.text.bodySmall)),
@@ -242,16 +429,12 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                           leading: const Icon(Icons.language),
                           title: const Text('Language'),
                           subtitle: const Text('Preference saved.'),
-                          trailing: DropdownButton<String>(
-                            value: prefs.language,
-                            underline: const SizedBox.shrink(),
-                            items: const [
-                              DropdownMenuItem(value: 'English', child: Text('English')),
-                              DropdownMenuItem(value: 'Urdu', child: Text('اردو')),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) prefs.setLanguage(v);
-                            },
+                          trailing: Text(
+                            'English',
+                            style: context.text.bodyMedium?.copyWith(
+                              color: context.appColors.mutedText,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                         SwitchListTile(
@@ -259,17 +442,6 @@ class _RiderProfileScreenState extends State<RiderProfileScreen> {
                           title: const Text('Dark Mode'),
                           value: theme.isDark(context),
                           onChanged: theme.setDark,
-                        ),
-                        ListTile(
-                          leading: Icon(sync.isOnline ? Icons.cloud_done_outlined : Icons.cloud_off),
-                          title: const Text('Offline Sync'),
-                          subtitle: Text(
-                            sync.lastSync == null
-                                ? '${sync.pendingCount} queued - never synced'
-                                : '${sync.pendingCount} queued - last synced ${DateTimeUtils.relative(sync.lastSync!)}',
-                          ),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: _showQueue,
                         ),
                       ],
                     ),
@@ -318,53 +490,6 @@ class _ColorOption extends StatelessWidget {
           SizedBox(height: 4.h),
           Text(label, style: context.text.labelSmall),
         ],
-      ),
-    );
-  }
-}
-
-class _QueueSheet extends StatelessWidget {
-  const _QueueSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    final sync = context.watch<SyncProvider>();
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Offline queue', style: context.text.titleMedium),
-            Text(sync.isOnline ? 'Online' : 'Offline - actions will sync automatically', style: context.text.bodySmall),
-            SizedBox(height: AppSpacing.sm),
-            if (sync.queue.isEmpty)
-              const Padding(padding: EdgeInsets.all(16), child: Text('Nothing waiting to sync.'))
-            else
-              ...sync.queue.map(
-                (a) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('${a.type} - ${a.payload['orderId'] ?? ''}'),
-                  subtitle: Text('${a.state.name}${a.error == null ? '' : ' - ${a.error}'}'),
-                  trailing: a.state == SyncState.failed
-                      ? IconButton(
-                          tooltip: 'Discard',
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => sync.discard(a.id),
-                        )
-                      : null,
-                ),
-              ),
-            SizedBox(height: AppSpacing.sm),
-            CommonButton(
-              label: 'Sync now',
-              icon: Icons.sync,
-              isLoading: sync.isSyncing,
-              onPressed: sync.isOnline && sync.pendingCount > 0 ? sync.syncNow : null,
-            ),
-          ],
-        ),
       ),
     );
   }

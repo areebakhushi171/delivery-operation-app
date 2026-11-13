@@ -53,6 +53,7 @@ abstract class RiderRepository {
     int? battery,
   });
   Future<void> updateProfile(String riderId, {required String name, required String phone});
+  Future<void> updateProfilePhoto(String riderId, String? photoUrl);
 }
 
 abstract class ExceptionRepository {
