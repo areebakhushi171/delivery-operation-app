@@ -50,217 +50,220 @@ class _AdminRidersScreenState extends State<AdminRidersScreen> {
         title: 'Riders Management',
         subtitle: '${allRiders.length} Registered Couriers',
       ),
-      body: Column(
-        children: [
-          // Fleet overview from the same rider list
-          Padding(
-            padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, 0),
-            child: GlassCard(
-              blur: false,
-              padding: EdgeInsets.all(14.w),
-              child: DonutChart(
-                size: 96,
-                centerValue: '${allRiders.length}',
-                centerLabel: 'riders',
-                slices: [
-                  DonutSlice('On duty', dash.activeFleet.toDouble(), AppColors.lightGreen),
-                  DonutSlice('Off duty', (allRiders.length - dash.activeFleet).toDouble(), AppColors.orange),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(AppSpacing.screen),
-            child: CommonSearchField(
-              hint: 'Search riders by name, email, phone, staff ID...',
-              onChanged: (val) => setState(() => _searchQuery = val),
-            ),
-          ).animate().fadeIn(duration: 300.ms),
-          SizedBox(
-            height: 38.h,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
-              children: [
-                ChoiceChip(
-                  label: const Text('All Riders'),
-                  selected: _statusFilter == null,
-                  onSelected: (_) => setState(() => _statusFilter = null),
-                ),
-                SizedBox(width: AppSpacing.sm),
-                ChoiceChip(
-                  label: const Text('On Duty'),
-                  selected: _statusFilter == DutyStatus.onDuty,
-                  onSelected: (_) => setState(() => _statusFilter = DutyStatus.onDuty),
-                ),
-                SizedBox(width: AppSpacing.sm),
-                ChoiceChip(
-                  label: const Text('Off Duty'),
-                  selected: _statusFilter == DutyStatus.offDuty,
-                  onSelected: (_) => setState(() => _statusFilter = DutyStatus.offDuty),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: AppSpacing.sm),
-          Expanded(
-            child: filteredRiders.isEmpty
-                ? const CommonEmptyState(
-              title: 'No Registered Riders',
-              message: 'No riders found matching your filter criteria.',
-            )
-                : ListView.builder(
-              padding: EdgeInsets.all(AppSpacing.screen),
-              itemCount: filteredRiders.length,
-              itemBuilder: (context, index) {
-                final r = filteredRiders[index];
-                final assignedOrders = allOrders.where((o) => o.riderId == r.id).toList();
-                final activeOrders = assignedOrders.where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.failed).toList();
-                final completedOrders = assignedOrders.where((o) => o.status == OrderStatus.delivered).toList();
-
-                final statusColor = r.dutyStatus == DutyStatus.onDuty ? c.success : c.warning;
-
-                return Container(
-                  margin: EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: CommonCard(
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => _RiderDetailSheet(
-                          rider: r,
-                          assignedOrders: assignedOrders,
-                        ),
-                      );
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        onRefresh: () async => await Future.delayed(const Duration(milliseconds: 500)),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  // Fleet overview from the same rider list
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, 0),
+                    child: GlassCard(
+                      blur: false,
+                      padding: EdgeInsets.all(14.w),
+                      child: DonutChart(
+                        size: 96,
+                        centerValue: '${allRiders.length}',
+                        centerLabel: 'riders',
+                        slices: [
+                          DonutSlice('On duty', dash.activeFleet.toDouble(), AppColors.lightGreen),
+                          DonutSlice('Off duty', (allRiders.length - dash.activeFleet).toDouble(), AppColors.orange),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(AppSpacing.screen),
+                    child: CommonSearchField(
+                      hint: 'Search riders by name, email, phone, staff ID...',
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                    ),
+                  ).animate().fadeIn(duration: 300.ms),
+                  SizedBox(
+                    height: 38.h,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
                       children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24.r,
-                              backgroundColor: statusColor.withAlpha(30),
-                              child: Icon(Icons.two_wheeler, color: statusColor, size: 24.w),
-                            ),
-                            SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(r.name, style: context.text.titleSmall),
-                                      SizedBox(width: 6.w),
-                                      Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                        decoration: BoxDecoration(
-                                          color: c.mutedText.withAlpha(30),
-                                          borderRadius: BorderRadius.circular(4.r),
-                                        ),
-                                        child: Text('#${r.staffId}', style: context.text.labelSmall),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 2.h),
-                                  Text(r.email, style: context.text.bodySmall),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                              decoration: BoxDecoration(
-                                color: statusColor.withAlpha(30),
-                                borderRadius: BorderRadius.circular(AppRadius.chip),
-                              ),
-                              child: Text(
-                                r.dutyStatus.name.toUpperCase(),
-                                style: context.text.labelSmall?.copyWith(color: statusColor, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
+                        ChoiceChip(
+                          label: const Text('All Riders'),
+                          selected: _statusFilter == null,
+                          onSelected: (_) => setState(() => _statusFilter = null),
                         ),
-                        const Divider(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.phone_outlined, size: 16.w, color: c.mutedText),
-                                SizedBox(width: 4.w),
-                                Text(r.phone, style: context.text.bodySmall),
-                              ],
-                            ),
-                            if (r.vehicleType.isNotEmpty)
-                              Row(
-                                children: [
-                                  Icon(Icons.directions_bike, size: 16.w, color: c.mutedText),
-                                  SizedBox(width: 4.w),
-                                  Text('${r.vehicleType} (${r.vehicleReg})', style: context.text.bodySmall),
-                                ],
-                              ),
-                          ],
+                        SizedBox(width: AppSpacing.sm),
+                        ChoiceChip(
+                          label: const Text('On Duty'),
+                          selected: _statusFilter == DutyStatus.onDuty,
+                          onSelected: (_) => setState(() => _statusFilter = DutyStatus.onDuty),
                         ),
-                        SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                padding: EdgeInsets.all(8.w),
-                                decoration: BoxDecoration(
-                                  color: c.info.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(AppRadius.chip),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text('${activeOrders.length}', style: context.text.titleSmall?.copyWith(color: c.info)),
-                                    Text('Active Orders', style: context.text.labelSmall),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: AppSpacing.xs),
-                            Expanded(
-                              child: Container(
-                                padding: EdgeInsets.all(8.w),
-                                decoration: BoxDecoration(
-                                  color: c.success.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(AppRadius.chip),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text('${completedOrders.length}', style: context.text.titleSmall?.copyWith(color: c.success)),
-                                    Text('Completed', style: context.text.labelSmall),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: AppSpacing.xs),
-                            Expanded(
-                              child: Container(
-                                padding: EdgeInsets.all(8.w),
-                                decoration: BoxDecoration(
-                                  color: c.warning.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(AppRadius.chip),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(r.rating.toStringAsFixed(1), style: context.text.titleSmall?.copyWith(color: c.warning)),
-                                    Text('Rating ★', style: context.text.labelSmall),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                        SizedBox(width: AppSpacing.sm),
+                        ChoiceChip(
+                          label: const Text('Off Duty'),
+                          selected: _statusFilter == DutyStatus.offDuty,
+                          onSelected: (_) => setState(() => _statusFilter = DutyStatus.offDuty),
                         ),
                       ],
                     ),
                   ),
-                ).animate().fadeIn(duration: 400.ms, delay: (index * 50).ms);
-              },
+                  SizedBox(height: AppSpacing.sm),
+                ],
+              ),
             ),
-          ),
-        ],
+            if (filteredRiders.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 40, bottom: 60),
+                  child: CommonEmptyState(
+                    title: 'No Registered Riders',
+                    message: 'No riders found matching your filter criteria.',
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, AppSpacing.screen),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final r = filteredRiders[index];
+                      final assignedOrders = allOrders.where((o) => o.riderId == r.id).toList();
+                      final activeOrders = assignedOrders.where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.failed).toList();
+                      final completedOrders = assignedOrders.where((o) => o.status == OrderStatus.delivered).toList();
+
+                      final statusColor = r.dutyStatus == DutyStatus.onDuty ? c.success : c.warning;
+
+                      return Container(
+                        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: CommonCard(
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              builder: (_) => _RiderDetailSheet(
+                                rider: r,
+                                assignedOrders: assignedOrders,
+                              ),
+                            );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 24.r,
+                                    backgroundColor: statusColor.withAlpha(30),
+                                    child: Icon(Icons.two_wheeler, color: statusColor, size: 24.w),
+                                  ),
+                                  SizedBox(width: AppSpacing.sm),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(r.name, style: context.text.titleSmall),
+                                            SizedBox(width: 6.w),
+                                            Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                              decoration: BoxDecoration(
+                                                color: c.mutedText.withAlpha(30),
+                                                borderRadius: BorderRadius.circular(4.r),
+                                              ),
+                                              child: Text('#${r.staffId}', style: context.text.labelSmall),
+                                            ),
+                                          ],
+                                        ),
+                                        SizedBox(height: 2.h),
+                                        Text(r.email, style: context.text.bodySmall),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withAlpha(30),
+                                      borderRadius: BorderRadius.circular(AppRadius.chip),
+                                    ),
+                                    child: Text(
+                                      r.dutyStatus.name.toUpperCase(),
+                                      style: context.text.labelSmall?.copyWith(color: statusColor, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.phone_outlined, size: 16.w, color: c.mutedText),
+                                      SizedBox(width: 4.w),
+                                      Text(r.phone, style: context.text.bodySmall),
+                                    ],
+                                  ),
+                                  if (r.vehicleType.isNotEmpty)
+                                    Row(
+                                      children: [
+                                        Icon(Icons.directions_bike, size: 16.w, color: c.mutedText),
+                                        SizedBox(width: 4.w),
+                                        Text('${r.vehicleType} (${r.vehicleReg})', style: context.text.bodySmall),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                              SizedBox(height: AppSpacing.sm),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      padding: EdgeInsets.all(8.w),
+                                      decoration: BoxDecoration(
+                                        color: c.info.withAlpha(20),
+                                        borderRadius: BorderRadius.circular(AppRadius.chip),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Text('${activeOrders.length}', style: context.text.titleSmall?.copyWith(color: c.info)),
+                                          Text('Active Orders', style: context.text.labelSmall),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                    child: Container(
+                                      padding: EdgeInsets.all(8.w),
+                                      decoration: BoxDecoration(
+                                        color: c.success.withAlpha(20),
+                                        borderRadius: BorderRadius.circular(AppRadius.chip),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Text('${completedOrders.length}', style: context.text.titleSmall?.copyWith(color: c.success)),
+                                          Text('Completed', style: context.text.labelSmall),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ).animate().fadeIn(duration: 400.ms, delay: (index * 50).ms);
+                    },
+                    childCount: filteredRiders.length,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -273,7 +276,6 @@ class _RiderDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.appColors;
     final primaryColor = context.scheme.primary;
 
     return Container(
@@ -340,14 +342,6 @@ class _RiderDetailSheet extends StatelessWidget {
                     children: [
                       Text('Vehicle', style: context.text.bodyMedium),
                       Text('${rider.vehicleType} (${rider.vehicleReg})', style: context.text.titleSmall),
-                    ],
-                  ),
-                  const Divider(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Performance Rating', style: context.text.bodyMedium),
-                      Text('${rider.rating.toStringAsFixed(1)} ★', style: context.text.titleSmall?.copyWith(color: c.warning)),
                     ],
                   ),
                 ],

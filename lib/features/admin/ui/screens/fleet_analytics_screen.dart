@@ -287,13 +287,17 @@ class _FleetAnalyticsScreenState extends State<FleetAnalyticsScreen> {
 
     return Scaffold(
       appBar: const CommonAppBar(title: 'Fleet Analytics & Reports', showBack: false),
-      body: ListView(
-        key: const PageStorageKey('admin_analytics_scroll'),
-        padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.xl),
-        children: [
-          for (var i = 0; i < sections.length; i++)
-            sections[i].animate().fadeIn(delay: (40 * i).ms, duration: 300.ms),
-        ],
+      body: RefreshIndicator(
+        onRefresh: () async => await Future.delayed(const Duration(milliseconds: 500)),
+        child: ListView(
+          key: const PageStorageKey('admin_analytics_scroll'),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.xl),
+          children: [
+            for (var i = 0; i < sections.length; i++)
+              sections[i].animate().fadeIn(delay: (40 * i).ms, duration: 300.ms),
+          ],
+        ),
       ),
     );
   }

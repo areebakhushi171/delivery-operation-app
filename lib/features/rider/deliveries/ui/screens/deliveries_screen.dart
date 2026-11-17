@@ -33,62 +33,81 @@ class DeliveriesScreen extends StatelessWidget {
           backgroundColor: Colors.transparent,
           appBar: const CommonAppBar(title: "Today's Deliveries", showBack: false),
           body: KeyboardDismissOnTap(
-            child: Column(
-              children: [
-                // Top Summary Card with colored donut ring & legend
-                Padding(
-                  padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.sm),
-                  child: _DeliveriesSummaryCard(p: p),
-                ),
-                // Search bar
-                Padding(
-                  padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, AppSpacing.sm),
-                  child: CommonSearchField(hint: 'Search orders...', onChanged: p.setQuery),
-                ),
-                // Filter pills row (All, Pending, In Transit, Delivered, Failed)
-                SizedBox(
-                  height: 44.h,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
-                    children: [
-                      _filterPill(context, p, RiderStatusFilter.all, 'All'),
-                      SizedBox(width: 8.w),
-                      _filterPill(context, p, RiderStatusFilter.pending, 'Pending'),
-                      SizedBox(width: 8.w),
-                      _filterPill(context, p, RiderStatusFilter.inTransit, 'In Transit'),
-                      SizedBox(width: 8.w),
-                      _filterPill(context, p, RiderStatusFilter.delivered, 'Delivered'),
-                      SizedBox(width: 8.w),
-                      _filterPill(context, p, RiderStatusFilter.failed, 'Failed'),
-                    ],
-                  ),
-                ),
-                SizedBox(height: AppSpacing.sm),
-                // Deliveries List
-                Expanded(
-                  child: p.isLoadingInitial
-                      ? const CommonLoadingWidget(skeleton: true)
-                      : RefreshIndicator(
-                    onRefresh: p.refresh,
-                    child: p.error != null
-                        ? _Scrollable(CommonErrorState(message: p.error!, onRetry: p.refresh))
-                        : list.isEmpty
-                        ? const _Scrollable(CommonEmptyState(
-                      icon: Icons.local_shipping_outlined,
-                      title: 'No deliveries found',
-                      message: 'Try a different filter or pull down to refresh.',
-                    ))
-                        : ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, 96.h),
-                      itemCount: list.length,
-                      separatorBuilder: (_, __) => SizedBox(height: AppSpacing.gap),
-                      itemBuilder: (_, i) => DeliveryCard(order: list[i]),
+            child: RefreshIndicator(
+              onRefresh: p.refresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        // Top Summary Card with colored donut ring & legend
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.sm),
+                          child: _DeliveriesSummaryCard(p: p),
+                        ),
+                        // Search bar
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, AppSpacing.sm),
+                          child: CommonSearchField(hint: 'Search orders...', onChanged: p.setQuery),
+                        ),
+                        // Filter pills row (All, Pending, In Transit, Delivered, Failed)
+                        SizedBox(
+                          height: 44.h,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
+                            children: [
+                              _filterPill(context, p, RiderStatusFilter.all, 'All'),
+                              SizedBox(width: 8.w),
+                              _filterPill(context, p, RiderStatusFilter.pending, 'Pending'),
+                              SizedBox(width: 8.w),
+                              _filterPill(context, p, RiderStatusFilter.inTransit, 'In Transit'),
+                              SizedBox(width: 8.w),
+                              _filterPill(context, p, RiderStatusFilter.delivered, 'Delivered'),
+                              SizedBox(width: 8.w),
+                              _filterPill(context, p, RiderStatusFilter.failed, 'Failed'),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: AppSpacing.sm),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  if (p.isLoadingInitial)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: CommonLoadingWidget(skeleton: true),
+                    )
+                  else if (p.error != null)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: CommonErrorState(message: p.error!, onRetry: p.refresh),
+                    )
+                  else if (list.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: CommonEmptyState(
+                        icon: Icons.local_shipping_outlined,
+                        title: 'No deliveries found',
+                        message: 'Try a different filter or pull down to refresh.',
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, 96.h),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) => Padding(
+                            padding: EdgeInsets.only(bottom: AppSpacing.gap),
+                            child: DeliveryCard(order: list[i]),
+                          ),
+                          childCount: list.length,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -314,17 +333,4 @@ class _DonutPainter extends CustomPainter {
     }
     return false;
   }
-}
-
-class _Scrollable extends StatelessWidget {
-  const _Scrollable(this.child);
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (_, box) => ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [SizedBox(height: box.maxHeight, child: child)],
-    ),
-  );
 }
