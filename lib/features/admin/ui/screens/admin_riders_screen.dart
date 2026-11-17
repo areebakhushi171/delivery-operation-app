@@ -52,8 +52,25 @@ class _AdminRidersScreenState extends State<AdminRidersScreen> {
       ),
       body: Column(
         children: [
+          // Fleet overview from the same rider list
           Padding(
-            padding: EdgeInsets.all(AppSpacing.md),
+            padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, 0),
+            child: GlassCard(
+              blur: false,
+              padding: EdgeInsets.all(14.w),
+              child: DonutChart(
+                size: 96,
+                centerValue: '${allRiders.length}',
+                centerLabel: 'riders',
+                slices: [
+                  DonutSlice('On duty', dash.activeFleet.toDouble(), AppColors.lightGreen),
+                  DonutSlice('Off duty', (allRiders.length - dash.activeFleet).toDouble(), AppColors.orange),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(AppSpacing.screen),
             child: CommonSearchField(
               hint: 'Search riders by name, email, phone, staff ID...',
               onChanged: (val) => setState(() => _searchQuery = val),
@@ -63,7 +80,7 @@ class _AdminRidersScreenState extends State<AdminRidersScreen> {
             height: 38.h,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
               children: [
                 ChoiceChip(
                   label: const Text('All Riders'),
@@ -89,159 +106,159 @@ class _AdminRidersScreenState extends State<AdminRidersScreen> {
           Expanded(
             child: filteredRiders.isEmpty
                 ? const CommonEmptyState(
-                    title: 'No Registered Riders',
-                    message: 'No riders found matching your filter criteria.',
-                  )
+              title: 'No Registered Riders',
+              message: 'No riders found matching your filter criteria.',
+            )
                 : ListView.builder(
-                    padding: EdgeInsets.all(AppSpacing.md),
-                    itemCount: filteredRiders.length,
-                    itemBuilder: (context, index) {
-                      final r = filteredRiders[index];
-                      final assignedOrders = allOrders.where((o) => o.riderId == r.id).toList();
-                      final activeOrders = assignedOrders.where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.failed).toList();
-                      final completedOrders = assignedOrders.where((o) => o.status == OrderStatus.delivered).toList();
+              padding: EdgeInsets.all(AppSpacing.screen),
+              itemCount: filteredRiders.length,
+              itemBuilder: (context, index) {
+                final r = filteredRiders[index];
+                final assignedOrders = allOrders.where((o) => o.riderId == r.id).toList();
+                final activeOrders = assignedOrders.where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.failed).toList();
+                final completedOrders = assignedOrders.where((o) => o.status == OrderStatus.delivered).toList();
 
-                      final statusColor = r.dutyStatus == DutyStatus.onDuty ? c.success : c.warning;
+                final statusColor = r.dutyStatus == DutyStatus.onDuty ? c.success : c.warning;
 
-                      return Container(
-                        margin: EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: CommonCard(
-                          onTap: () {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              builder: (_) => _RiderDetailSheet(
-                                rider: r,
-                                assignedOrders: assignedOrders,
-                              ),
-                            );
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 24.r,
-                                    backgroundColor: statusColor.withAlpha(30),
-                                    child: Icon(Icons.two_wheeler, color: statusColor, size: 24.w),
-                                  ),
-                                  SizedBox(width: AppSpacing.sm),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(r.name, style: context.text.titleSmall),
-                                            SizedBox(width: 6.w),
-                                            Container(
-                                              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.withAlpha(30),
-                                                borderRadius: BorderRadius.circular(4.r),
-                                              ),
-                                              child: Text('#${r.staffId}', style: context.text.labelSmall),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 2.h),
-                                        Text(r.email, style: context.text.bodySmall),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withAlpha(30),
-                                      borderRadius: BorderRadius.circular(AppRadius.chip),
-                                    ),
-                                    child: Text(
-                                      r.dutyStatus.name.toUpperCase(),
-                                      style: context.text.labelSmall?.copyWith(color: statusColor, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Divider(),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                return Container(
+                  margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: CommonCard(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => _RiderDetailSheet(
+                          rider: r,
+                          assignedOrders: assignedOrders,
+                        ),
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 24.r,
+                              backgroundColor: statusColor.withAlpha(30),
+                              child: Icon(Icons.two_wheeler, color: statusColor, size: 24.w),
+                            ),
+                            SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.phone_outlined, size: 16.w, color: c.mutedText),
-                                      SizedBox(width: 4.w),
-                                      Text(r.phone, style: context.text.bodySmall),
+                                      Text(r.name, style: context.text.titleSmall),
+                                      SizedBox(width: 6.w),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                        decoration: BoxDecoration(
+                                          color: c.mutedText.withAlpha(30),
+                                          borderRadius: BorderRadius.circular(4.r),
+                                        ),
+                                        child: Text('#${r.staffId}', style: context.text.labelSmall),
+                                      ),
                                     ],
                                   ),
-                                  if (r.vehicleType.isNotEmpty)
-                                    Row(
-                                      children: [
-                                        Icon(Icons.directions_bike, size: 16.w, color: c.mutedText),
-                                        SizedBox(width: 4.w),
-                                        Text('${r.vehicleType} (${r.vehicleReg})', style: context.text.bodySmall),
-                                      ],
-                                    ),
+                                  SizedBox(height: 2.h),
+                                  Text(r.email, style: context.text.bodySmall),
                                 ],
                               ),
-                              SizedBox(height: AppSpacing.sm),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                              decoration: BoxDecoration(
+                                color: statusColor.withAlpha(30),
+                                borderRadius: BorderRadius.circular(AppRadius.chip),
+                              ),
+                              child: Text(
+                                r.dutyStatus.name.toUpperCase(),
+                                style: context.text.labelSmall?.copyWith(color: statusColor, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.phone_outlined, size: 16.w, color: c.mutedText),
+                                SizedBox(width: 4.w),
+                                Text(r.phone, style: context.text.bodySmall),
+                              ],
+                            ),
+                            if (r.vehicleType.isNotEmpty)
                               Row(
                                 children: [
-                                  Expanded(
-                                    child: Container(
-                                      padding: EdgeInsets.all(8.w),
-                                      decoration: BoxDecoration(
-                                        color: c.info.withAlpha(20),
-                                        borderRadius: BorderRadius.circular(AppRadius.chip),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Text('${activeOrders.length}', style: context.text.titleSmall?.copyWith(color: c.info)),
-                                          Text('Active Orders', style: context.text.labelSmall),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: AppSpacing.xs),
-                                  Expanded(
-                                    child: Container(
-                                      padding: EdgeInsets.all(8.w),
-                                      decoration: BoxDecoration(
-                                        color: c.success.withAlpha(20),
-                                        borderRadius: BorderRadius.circular(AppRadius.chip),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Text('${completedOrders.length}', style: context.text.titleSmall?.copyWith(color: c.success)),
-                                          Text('Completed', style: context.text.labelSmall),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: AppSpacing.xs),
-                                  Expanded(
-                                    child: Container(
-                                      padding: EdgeInsets.all(8.w),
-                                      decoration: BoxDecoration(
-                                        color: c.warning.withAlpha(20),
-                                        borderRadius: BorderRadius.circular(AppRadius.chip),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Text(r.rating.toStringAsFixed(1), style: context.text.titleSmall?.copyWith(color: c.warning)),
-                                          Text('Rating ★', style: context.text.labelSmall),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                                  Icon(Icons.directions_bike, size: 16.w, color: c.mutedText),
+                                  SizedBox(width: 4.w),
+                                  Text('${r.vehicleType} (${r.vehicleReg})', style: context.text.bodySmall),
                                 ],
                               ),
-                            ],
-                          ),
+                          ],
                         ),
-                      ).animate().fadeIn(duration: 400.ms, delay: (index * 50).ms);
-                    },
+                        SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: EdgeInsets.all(8.w),
+                                decoration: BoxDecoration(
+                                  color: c.info.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text('${activeOrders.length}', style: context.text.titleSmall?.copyWith(color: c.info)),
+                                    Text('Active Orders', style: context.text.labelSmall),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Container(
+                                padding: EdgeInsets.all(8.w),
+                                decoration: BoxDecoration(
+                                  color: c.success.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text('${completedOrders.length}', style: context.text.titleSmall?.copyWith(color: c.success)),
+                                    Text('Completed', style: context.text.labelSmall),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Container(
+                                padding: EdgeInsets.all(8.w),
+                                decoration: BoxDecoration(
+                                  color: c.warning.withAlpha(20),
+                                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(r.rating.toStringAsFixed(1), style: context.text.titleSmall?.copyWith(color: c.warning)),
+                                    Text('Rating ★', style: context.text.labelSmall),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                ).animate().fadeIn(duration: 400.ms, delay: (index * 50).ms);
+              },
+            ),
           ),
         ],
       ),
@@ -299,7 +316,7 @@ class _RiderDetailSheet extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.phone_rounded, color: Colors.green),
+                  icon: Icon(Icons.phone_rounded, color: context.appColors.success),
                   onPressed: () => LauncherService.call(rider.phone),
                 ),
               ],
@@ -348,19 +365,19 @@ class _RiderDetailSheet extends StatelessWidget {
               )
             else
               ...assignedOrders.map((o) => Container(
-                    margin: EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.inventory_2_outlined, color: primaryColor),
-                      title: Text('Order #${o.id} • ${o.customerName}'),
-                      subtitle: Text(o.address, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      trailing: CommonStatusChip.order(o.status),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push(AppRoutes.adminOrder(o.id));
-                      },
-                    ),
-                  )),
+                margin: EdgeInsets.only(bottom: AppSpacing.xs),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.inventory_2_outlined, color: primaryColor),
+                  title: Text('Order #${o.id} • ${o.customerName}'),
+                  subtitle: Text(o.address, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: CommonStatusChip.order(o.status),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push(AppRoutes.adminOrder(o.id));
+                  },
+                ),
+              )),
           ],
         ),
       ),

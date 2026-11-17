@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'core/config/app_config.dart';
 import 'core/data/repository_factory.dart';
+import 'core/services/push_service.dart';
 import 'core/storage/local_storage.dart';
 import 'features/app/delivery_ops_app.dart';
 import 'firebase_options.dart';
@@ -12,6 +13,7 @@ Future<void> main() async {
   if (AppConfig.useFirebase) {
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      await PushService.initialize();
     } catch (e) {
       debugPrint('Firebase init notice: $e');
     }
