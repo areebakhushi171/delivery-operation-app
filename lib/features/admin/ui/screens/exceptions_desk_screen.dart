@@ -1,4 +1,4 @@
-
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/core.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../authentication/providers/auth_provider.dart';
 import '../../providers/admin_providers.dart';
 
@@ -52,12 +53,10 @@ class ExceptionsDeskScreen extends StatefulWidget {
   const ExceptionsDeskScreen({super.key});
 
   @override
-  State<ExceptionsDeskScreen> createState() =>
-      _ExceptionsDeskScreenState();
+  State<ExceptionsDeskScreen> createState() => _ExceptionsDeskScreenState();
 }
 
-class _ExceptionsDeskScreenState
-    extends State<ExceptionsDeskScreen> {
+class _ExceptionsDeskScreenState extends State<ExceptionsDeskScreen> {
   bool _showOpen = true;
   bool _openingSheet = false;
 
@@ -82,6 +81,8 @@ class _ExceptionsDeskScreenState
 
       debugPrint('EXCEPTIONS: Opening action sheet for ${ex.id}');
 
+      final size = MediaQuery.sizeOf(context);
+
       final message = await showModalBottomSheet<String>(
         context: context,
         isScrollControlled: true,
@@ -92,8 +93,9 @@ class _ExceptionsDeskScreenState
         showDragHandle: false,
         backgroundColor: Colors.transparent,
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.90,
+          // Web/tablet par sheet 640px se zyada chaudi na ho
+          maxWidth: math.min(size.width, 640),
+          maxHeight: size.height * 0.90,
         ),
         builder: (sheetContext) {
           debugPrint('EXCEPTIONS: Action sheet built');
@@ -134,6 +136,7 @@ class _ExceptionsDeskScreenState
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<AdminExceptionsProvider>();
+    final wide = Responsive.isWide(context);
 
     if (prov.isLoading) {
       return const Scaffold(
@@ -153,108 +156,140 @@ class _ExceptionsDeskScreenState
       appBar: const CommonAppBar(
         title: 'Exceptions Triage Desk',
       ),
-      body: RefreshIndicator(
-        onRefresh: () async => await Future.delayed(const Duration(milliseconds: 500)),
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      AppSpacing.screen,
-                      AppSpacing.sm,
-                      AppSpacing.screen,
-                      AppSpacing.xs,
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: SegmentedButton<bool>(
-                        showSelectedIcon: false,
-                        segments: [
-                          ButtonSegment(
-                            value: true,
-                            label: Text('Open (${open.length})'),
-                          ),
-                          ButtonSegment(
-                            value: false,
-                            label: Text('Closed (${closed.length})'),
-                          ),
-                        ],
-                        selected: {_showOpen},
-                        onSelectionChanged: (s) {
-                          setState(() => _showOpen = s.first);
-                        },
-                      ),
-                    ),
-                  ),
-                  // Exceptions by reason (from the same provider data)
-                  if (all.isNotEmpty)
+      body: ResponsivePad(
+        maxWidth: 1250,
+        builder: (context, pad) => RefreshIndicator(
+          onRefresh: () async =>
+          await Future.delayed(const Duration(milliseconds: 500)),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: padSlivers(pad, [
+              SliverToBoxAdapter(
+                child: Column(
+                  children: [
                     Padding(
-                      padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.xs, AppSpacing.screen, AppSpacing.sm),
-                      child: GlassCard(
-                        blur: false,
-                        padding: EdgeInsets.all(14.w),
-                        child: DonutChart(
-                          size: 96,
-                          centerValue: '${all.length}',
-                          centerLabel: 'reported',
-                          slices: [
-                            for (var i = 0; i < ExceptionReason.values.length; i++)
-                              if (all.any((e) => e.reason == ExceptionReason.values[i]))
-                                DonutSlice(
-                                  ExceptionReason.values[i].label,
-                                  all.where((e) => e.reason == ExceptionReason.values[i]).length.toDouble(),
-                                  [context.scheme.primary, AppColors.orange, AppColors.pink, AppColors.lightGreen, AppColors.yellow, AppColors.sky][i % 6],
-                                ),
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpacing.screen,
+                        AppSpacing.sm,
+                        AppSpacing.screen,
+                        AppSpacing.xs,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<bool>(
+                          showSelectedIcon: false,
+                          segments: [
+                            ButtonSegment(
+                              value: true,
+                              label: Text('Open (${open.length})'),
+                            ),
+                            ButtonSegment(
+                              value: false,
+                              label: Text('Closed (${closed.length})'),
+                            ),
                           ],
+                          selected: {_showOpen},
+                          onSelectionChanged: (s) {
+                            setState(() => _showOpen = s.first);
+                          },
                         ),
                       ),
                     ),
-                ],
-              ),
-            ),
-            if (prov.error != null && all.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: CommonErrorState(message: prov.error!),
-              )
-            else if (list.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 40, bottom: 60),
-                  child: CommonEmptyState(
-                    title: _showOpen ? 'All clear' : 'Nothing closed yet',
-                    message: _showOpen ? 'No open delivery exceptions right now.' : 'Closed exceptions will appear here.',
-                  ),
+                    // Exceptions by reason (from the same provider data)
+                    if (all.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.screen,
+                          AppSpacing.xs,
+                          AppSpacing.screen,
+                          AppSpacing.sm,
+                        ),
+                        child: GlassCard(
+                          blur: false,
+                          padding: EdgeInsets.all(14.w),
+                          child: DonutChart(
+                            size: wide ? 112 : 96,
+                            centerValue: '${all.length}',
+                            centerLabel: 'reported',
+                            slices: [
+                              for (var i = 0;
+                              i < ExceptionReason.values.length;
+                              i++)
+                                if (all.any(
+                                        (e) => e.reason == ExceptionReason.values[i]))
+                                  DonutSlice(
+                                    ExceptionReason.values[i].label,
+                                    all
+                                        .where((e) =>
+                                    e.reason ==
+                                        ExceptionReason.values[i])
+                                        .length
+                                        .toDouble(),
+                                    [
+                                      context.scheme.primary,
+                                      AppColors.orange,
+                                      AppColors.pink,
+                                      AppColors.lightGreen,
+                                      AppColors.yellow,
+                                      AppColors.sky
+                                    ][i % 6],
+                                  ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              )
-            else
-              SliverPadding(
-                padding: EdgeInsets.all(AppSpacing.md),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final exception = list[i];
+              ),
+              if (prov.error != null && all.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: CommonErrorState(message: prov.error!),
+                )
+              else if (list.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 40, bottom: 60),
+                    child: CommonEmptyState(
+                      title: _showOpen ? 'All clear' : 'Nothing closed yet',
+                      message: _showOpen
+                          ? 'No open delivery exceptions right now.'
+                          : 'Closed exceptions will appear here.',
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  // Segmented button aur donut card ke barabar alignment
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.screen,
+                    AppSpacing.xs,
+                    AppSpacing.screen,
+                    AppSpacing.md,
+                  ),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                        final exception = list[i];
 
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          bottom: AppSpacing.sm,
-                        ),
-                        child: _ExceptionCard(
-                          ex: exception,
-                          isOpening: _openingSheet,
-                          onAction: () => _openSheet(exception),
-                        ),
-                      );
-                    },
-                    childCount: list.length,
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: AppSpacing.sm,
+                          ),
+                          child: _ExceptionCard(
+                            ex: exception,
+                            isOpening: _openingSheet,
+                            onAction: () => _openSheet(exception),
+                          ),
+                        );
+                      },
+                      childCount: list.length,
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ]),
+          ),
         ),
       ),
     );
@@ -411,7 +446,11 @@ class _ExceptionCard extends StatelessWidget {
             ),
           ],
           SizedBox(height: AppSpacing.sm),
-          Row(
+          // Wrap: chhoti screen par buttons overflow ke bajaye neeche aa jayen
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               OutlinedButton.icon(
                 onPressed: () {
@@ -423,27 +462,23 @@ class _ExceptionCard extends StatelessWidget {
                 ),
                 label: const Text('View order'),
               ),
-              if (isOpen) ...[
-                SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: isOpening ? null : onAction,
-                    icon: isOpening
-                        ? SizedBox(
-                      height: 16.w,
-                      width: 16.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    )
-                        : const Icon(
-                      Icons.bolt_rounded,
-                      size: 18,
+              if (isOpen)
+                FilledButton.icon(
+                  onPressed: isOpening ? null : onAction,
+                  icon: isOpening
+                      ? SizedBox(
+                    height: 16.w,
+                    width: 16.w,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
                     ),
-                    label: const Text('Take action'),
+                  )
+                      : const Icon(
+                    Icons.bolt_rounded,
+                    size: 18,
                   ),
+                  label: const Text('Take action'),
                 ),
-              ],
             ],
           ),
         ],
@@ -679,8 +714,7 @@ class _ActionSheetState extends State<_ActionSheet> {
   Future<void> _submit() async {
     if (_busy) return;
 
-    if (_action == _Action.reschedule &&
-        !_start.isAfter(DateTime.now())) {
+    if (_action == _Action.reschedule && !_start.isAfter(DateTime.now())) {
       setState(() {
         _error = 'Please select a future date and time.';
       });
@@ -711,12 +745,9 @@ class _ActionSheetState extends State<_ActionSheet> {
         outcome: _outcome,
         byUid: widget.adminUid,
         note: _note.isEmpty ? null : _note,
-        newRiderId:
-        _action == _Action.reassign ? _riderId : null,
-        newStart:
-        _action == _Action.reschedule ? _start : null,
-        newEnd:
-        _action == _Action.reschedule ? _end : null,
+        newRiderId: _action == _Action.reassign ? _riderId : null,
+        newStart: _action == _Action.reschedule ? _start : null,
+        newEnd: _action == _Action.reschedule ? _end : null,
       );
 
       if (!mounted) return;
@@ -751,7 +782,8 @@ class _ActionSheetState extends State<_ActionSheet> {
           decoration: BoxDecoration(
             color: context.appColors.card,
             borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
-            border: Border.all(color: context.appColors.glassBorder, width: 1.2),
+            border:
+            Border.all(color: context.appColors.glassBorder, width: 1.2),
           ),
           child: SafeArea(
             top: false,
@@ -777,454 +809,449 @@ class _ActionSheetState extends State<_ActionSheet> {
                       ),
                     ),
                   ),
-              SizedBox(height: AppSpacing.md),
+                  SizedBox(height: AppSpacing.md),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Exception action center',
-                      style: context.text.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed:
-                    _busy ? null : () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-
-              Text(
-                'Order #${widget.ex.orderId}',
-                style: context.text.titleMedium?.copyWith(
-                  color: context.scheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 4.h),
-              Text(
-                '${widget.ex.reason.label} • ${widget.ex.riderName}',
-                style: context.text.bodySmall?.copyWith(
-                  color: muted,
-                ),
-              ),
-
-              if (requested != null) ...[
-                SizedBox(height: AppSpacing.md),
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: c.info.withAlpha(25),
-                    borderRadius:
-                    BorderRadius.circular(AppRadius.input),
-                  ),
-                  child: Row(
+                  Row(
                     children: [
-                      Icon(
-                        Icons.event_repeat,
-                        size: 20.w,
-                        color: c.info,
-                      ),
-                      SizedBox(width: 8.w),
                       Expanded(
                         child: Text(
-                          'Rider requested: ${_fmt(requested)}',
-                          style: context.text.bodySmall,
+                          'Exception action center',
+                          style: context.text.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: _busy ? null : () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
                       ),
                     ],
                   ),
-                ),
-              ],
 
-              SizedBox(height: AppSpacing.md),
-
-              Text(
-                'Choose an action',
-                style: context.text.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: AppSpacing.sm),
-
-              _ActionTile(
-                icon: Icons.check_circle_outline,
-                title: 'Resolve',
-                subtitle: 'Close this report and notify the rider.',
-                selected: _action == _Action.resolve,
-                onTap: () => _selectAction(_Action.resolve),
-              ),
-
-              _ActionTile(
-                icon: Icons.event_repeat,
-                title: 'Reschedule delivery',
-                subtitle: 'Choose a new delivery date and time.',
-                selected: _action == _Action.reschedule,
-                onTap: () => _selectAction(_Action.reschedule),
-              ),
-
-              _ActionTile(
-                icon: Icons.swap_horiz_rounded,
-                title: 'Reassign to another rider',
-                subtitle: 'Transfer this order to another courier.',
-                selected: _action == _Action.reassign,
-                onTap: () => _selectAction(_Action.reassign),
-              ),
-
-              _ActionTile(
-                icon: Icons.undo_rounded,
-                title: 'Return to origin',
-                subtitle: 'Send the parcel back to the hub.',
-                selected: _action == _Action.rto,
-                onTap: () => _selectAction(_Action.rto),
-              ),
-
-              SizedBox(height: AppSpacing.md),
-
-              // RESCHEDULE WORKFLOW
-              if (_action == _Action.reschedule) ...[
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: context.scheme.outline.withAlpha(90),
+                  Text(
+                    'Order #${widget.ex.orderId}',
+                    style: context.text.titleMedium?.copyWith(
+                      color: context.scheme.primary,
+                      fontWeight: FontWeight.w700,
                     ),
-                    borderRadius:
-                    BorderRadius.circular(AppRadius.input),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'New delivery schedule',
-                        style: context.text.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    '${widget.ex.reason.label} • ${widget.ex.riderName}',
+                    style: context.text.bodySmall?.copyWith(
+                      color: muted,
+                    ),
+                  ),
+
+                  if (requested != null) ...[
+                    SizedBox(height: AppSpacing.md),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: c.info.withAlpha(25),
+                        borderRadius: BorderRadius.circular(AppRadius.input),
                       ),
-                      SizedBox(height: AppSpacing.sm),
-                      Row(
+                      child: Row(
                         children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _busy ? null : _pickDate,
-                              icon: const Icon(Icons.calendar_month),
-                              label: Text(
-                                DateFormat('EEE, d MMM')
-                                    .format(_start),
-                              ),
-                            ),
+                          Icon(
+                            Icons.event_repeat,
+                            size: 20.w,
+                            color: c.info,
                           ),
-                          SizedBox(width: AppSpacing.sm),
+                          SizedBox(width: 8.w),
                           Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _busy ? null : _pickTime,
-                              icon: const Icon(Icons.schedule),
-                              label: Text(
-                                DateFormat('h:mm a')
-                                    .format(_start),
-                              ),
+                            child: Text(
+                              'Rider requested: ${_fmt(requested)}',
+                              style: context.text.bodySmall,
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Delivery window duration',
-                        style: context.text.bodySmall?.copyWith(
-                          color: muted,
+                    ),
+                  ],
+
+                  SizedBox(height: AppSpacing.md),
+
+                  Text(
+                    'Choose an action',
+                    style: context.text.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: AppSpacing.sm),
+
+                  _ActionTile(
+                    icon: Icons.check_circle_outline,
+                    title: 'Resolve',
+                    subtitle: 'Close this report and notify the rider.',
+                    selected: _action == _Action.resolve,
+                    onTap: () => _selectAction(_Action.resolve),
+                  ),
+
+                  _ActionTile(
+                    icon: Icons.event_repeat,
+                    title: 'Reschedule delivery',
+                    subtitle: 'Choose a new delivery date and time.',
+                    selected: _action == _Action.reschedule,
+                    onTap: () => _selectAction(_Action.reschedule),
+                  ),
+
+                  _ActionTile(
+                    icon: Icons.swap_horiz_rounded,
+                    title: 'Reassign to another rider',
+                    subtitle: 'Transfer this order to another courier.',
+                    selected: _action == _Action.reassign,
+                    onTap: () => _selectAction(_Action.reassign),
+                  ),
+
+                  _ActionTile(
+                    icon: Icons.undo_rounded,
+                    title: 'Return to origin',
+                    subtitle: 'Send the parcel back to the hub.',
+                    selected: _action == _Action.rto,
+                    onTap: () => _selectAction(_Action.rto),
+                  ),
+
+                  SizedBox(height: AppSpacing.md),
+
+                  // RESCHEDULE WORKFLOW
+                  if (_action == _Action.reschedule) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: context.scheme.outline.withAlpha(90),
                         ),
+                        borderRadius: BorderRadius.circular(AppRadius.input),
                       ),
-                      SizedBox(height: 6.h),
-                      Wrap(
-                        spacing: 8.w,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          for (final h in [2, 3, 4])
-                            ChoiceChip(
-                              label: Text('$h hours'),
-                              selected: _hours == h,
-                              onSelected: _busy
+                          Text(
+                            'New delivery schedule',
+                            style: context.text.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: AppSpacing.sm),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _busy ? null : _pickDate,
+                                  icon: const Icon(Icons.calendar_month),
+                                  label: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      DateFormat('EEE, d MMM').format(_start),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _busy ? null : _pickTime,
+                                  icon: const Icon(Icons.schedule),
+                                  label: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      DateFormat('h:mm a').format(_start),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Delivery window duration',
+                            style: context.text.bodySmall?.copyWith(
+                              color: muted,
+                            ),
+                          ),
+                          SizedBox(height: 6.h),
+                          Wrap(
+                            spacing: 8.w,
+                            children: [
+                              for (final h in [2, 3, 4])
+                                ChoiceChip(
+                                  label: Text('$h hours'),
+                                  selected: _hours == h,
+                                  onSelected: _busy
+                                      ? null
+                                      : (_) {
+                                    setState(() {
+                                      _hours = h;
+                                    });
+                                  },
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'New window: ${DateFormat('h:mm a').format(_start)} – ${DateFormat('h:mm a').format(_end)}',
+                            style: context.text.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  // REASSIGN WORKFLOW
+                  if (_action == _Action.reassign) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: context.scheme.outline.withAlpha(90),
+                        ),
+                        borderRadius: BorderRadius.circular(AppRadius.input),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Choose replacement courier',
+                            style: context.text.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: AppSpacing.sm),
+                          if (_candidates.isEmpty)
+                            Text(
+                              'No other registered riders are available.',
+                              style: context.text.bodySmall?.copyWith(
+                                color: c.danger,
+                              ),
+                            )
+                          else
+                            DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              value: _riderId,
+                              decoration: const InputDecoration(
+                                labelText: 'Select courier',
+                                hintText: 'Choose a registered rider',
+                              ),
+                              items: [
+                                for (final r in _candidates)
+                                  DropdownMenuItem<String>(
+                                    value: r.id,
+                                    child: Text(
+                                      '${r.name} • ${r.dutyStatus.name}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                              onChanged: _busy
                                   ? null
-                                  : (_) {
+                                  : (v) {
                                 setState(() {
-                                  _hours = h;
+                                  _riderId = v;
                                 });
                               },
                             ),
                         ],
                       ),
-                      SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'New window: ${DateFormat('h:mm a').format(_start)} – ${DateFormat('h:mm a').format(_end)}',
-                        style: context.text.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              // REASSIGN WORKFLOW
-              if (_action == _Action.reassign) ...[
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: context.scheme.outline.withAlpha(90),
                     ),
-                    borderRadius:
-                    BorderRadius.circular(AppRadius.input),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Choose replacement courier',
-                        style: context.text.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                  ],
+
+                  // RESOLVE AND RTO INFORMATION
+                  if (_action == _Action.resolve || _action == _Action.rto) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: _action == _Action.resolve
+                            ? c.success.withAlpha(18)
+                            : c.warning.withAlpha(18),
+                        borderRadius: BorderRadius.circular(AppRadius.input),
                       ),
-                      SizedBox(height: AppSpacing.sm),
-                      if (_candidates.isEmpty)
-                        Text(
-                          'No other registered riders are available.',
-                          style: context.text.bodySmall?.copyWith(
-                            color: c.danger,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            _action == _Action.resolve
+                                ? Icons.check_circle_outline
+                                : Icons.local_shipping_outlined,
+                            color: _action == _Action.resolve
+                                ? c.success
+                                : c.warning,
                           ),
-                        )
-                      else
-                        DropdownButtonFormField<String>(
-                          isExpanded: true,
-                          value: _riderId,
-                          decoration: const InputDecoration(
-                            labelText: 'Select courier',
-                            hintText: 'Choose a registered rider',
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              _action == _Action.resolve
+                                  ? 'The exception report will be closed and the rider will be notified.'
+                                  : 'The order will be marked as Return to Origin. The rider will be instructed to return the parcel to the hub.',
+                              style: context.text.bodySmall,
+                            ),
                           ),
-                          items: [
-                            for (final r in _candidates)
-                              DropdownMenuItem<String>(
-                                value: r.id,
-                                child: Text(
-                                  '${r.name} • ${r.dutyStatus.name}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                          onChanged: _busy
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  SizedBox(height: AppSpacing.md),
+
+                  Text(
+                    'Message to rider (optional)',
+                    style: context.text.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 6.h),
+
+                  TextField(
+                    controller: _noteCtrl,
+                    enabled: !_busy,
+                    maxLines: 3,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText:
+                      'Write instructions or a message for the rider...',
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+
+                  SizedBox(height: AppSpacing.sm),
+
+                  Wrap(
+                    spacing: 6.w,
+                    runSpacing: 6.h,
+                    children: [
+                      for (final template in _templates)
+                        ActionChip(
+                          label: Text(
+                            template,
+                            style: context.text.labelSmall,
+                          ),
+                          onPressed: _busy
                               ? null
-                              : (v) {
+                              : () {
                             setState(() {
-                              _riderId = v;
+                              _noteCtrl.text = template;
                             });
                           },
                         ),
                     ],
                   ),
-                ),
-              ],
 
-              // RESOLVE AND RTO INFORMATION
-              if (_action == _Action.resolve ||
-                  _action == _Action.rto) ...[
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: _action == _Action.resolve
-                        ? c.success.withAlpha(18)
-                        : c.warning.withAlpha(18),
-                    borderRadius:
-                    BorderRadius.circular(AppRadius.input),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        _action == _Action.resolve
-                            ? Icons.check_circle_outline
-                            : Icons.local_shipping_outlined,
-                        color: _action == _Action.resolve
-                            ? c.success
-                            : c.warning,
-                      ),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Text(
-                          _action == _Action.resolve
-                              ? 'The exception report will be closed and the rider will be notified.'
-                              : 'The order will be marked as Return to Origin. The rider will be instructed to return the parcel to the hub.',
-                          style: context.text.bodySmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                  SizedBox(height: AppSpacing.md),
 
-              SizedBox(height: AppSpacing.md),
-
-              Text(
-                'Message to rider (optional)',
-                style: context.text.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 6.h),
-
-              TextField(
-                controller: _noteCtrl,
-                enabled: !_busy,
-                maxLines: 3,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText:
-                  'Write instructions or a message for the rider...',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-              ),
-
-              SizedBox(height: AppSpacing.sm),
-
-              Wrap(
-                spacing: 6.w,
-                runSpacing: 6.h,
-                children: [
-                  for (final template in _templates)
-                    ActionChip(
-                      label: Text(
-                        template,
-                        style: context.text.labelSmall,
-                      ),
-                      onPressed: _busy
-                          ? null
-                          : () {
-                        setState(() {
-                          _noteCtrl.text = template;
-                        });
-                      },
+                  // NOTIFICATION PREVIEW
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: context.scheme.primary.withAlpha(18),
+                      borderRadius: BorderRadius.circular(AppRadius.input),
                     ),
-                ],
-              ),
-
-              SizedBox(height: AppSpacing.md),
-
-              // NOTIFICATION PREVIEW
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: context.scheme.primary.withAlpha(18),
-                  borderRadius:
-                  BorderRadius.circular(AppRadius.input),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.notifications_active_outlined,
-                          size: 18.w,
-                          color: context.scheme.primary,
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.notifications_active_outlined,
+                              size: 18.w,
+                              color: context.scheme.primary,
+                            ),
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Rider notification preview',
+                              style: context.text.labelMedium?.copyWith(
+                                color: context.scheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(width: 8.w),
+                        SizedBox(height: 8.h),
                         Text(
-                          'Rider notification preview',
-                          style: context.text.labelMedium?.copyWith(
-                            color: context.scheme.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          _preview,
+                          style: context.text.bodySmall,
                         ),
                       ],
                     ),
-                    SizedBox(height: 8.h),
-                    Text(
-                      _preview,
-                      style: context.text.bodySmall,
+                  ),
+
+                  if (_error != null) ...[
+                    SizedBox(height: AppSpacing.md),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: c.danger.withAlpha(20),
+                        borderRadius: BorderRadius.circular(AppRadius.input),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: c.danger,
+                            size: 18.w,
+                          ),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Text(
+                              _error!,
+                              style: context.text.bodySmall?.copyWith(
+                                color: c.danger,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                ),
-              ),
 
-              if (_error != null) ...[
-                SizedBox(height: AppSpacing.md),
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: c.danger.withAlpha(20),
-                    borderRadius:
-                    BorderRadius.circular(AppRadius.input),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: c.danger,
-                        size: 18.w,
-                      ),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: context.text.bodySmall?.copyWith(
-                            color: c.danger,
-                          ),
+                  SizedBox(height: AppSpacing.md),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : _submit,
+                      icon: _busy
+                          ? SizedBox(
+                        height: 18.w,
+                        width: 18.w,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
                         ),
+                      )
+                          : const Icon(Icons.send_rounded),
+                      label: Text(
+                        _busy ? 'Saving...' : _submitLabel,
                       ),
-                    ],
-                  ),
-                ),
-              ],
-
-              SizedBox(height: AppSpacing.md),
-
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _submit,
-                  icon: _busy
-                      ? SizedBox(
-                    height: 18.w,
-                    width: 18.w,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
                     ),
-                  )
-                      : const Icon(Icons.send_rounded),
-                  label: Text(
-                    _busy ? 'Saving...' : _submitLabel,
                   ),
-                ),
-              ),
 
-              SizedBox(height: 6.h),
+                  SizedBox(height: 6.h),
 
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed:
-                  _busy ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _busy ? null : () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 
   String get _submitLabel {
     switch (_action) {
@@ -1311,7 +1338,9 @@ class _ActionTile extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
                   color: selected ? primary : context.scheme.onSurfaceVariant,
                   size: 20.w,
                 ),

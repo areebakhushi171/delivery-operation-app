@@ -27,6 +27,9 @@ class NotificationsView extends StatefulWidget {
 class _NotificationsViewState extends State<NotificationsView> {
   bool _unreadOnly = false;
 
+  // Web/tablet par content ki max width.
+  static const double _maxContentWidth = 1250;
+
   @override
   Widget build(BuildContext context) {
     final p = context.watch<NotificationsProvider>();
@@ -41,55 +44,74 @@ class _NotificationsViewState extends State<NotificationsView> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(AppSpacing.md),
-            child: SegmentedButton<bool>(
-              segments: [
-                const ButtonSegment(value: false, label: Text('All')),
-                ButtonSegment(value: true, label: Text('Unread (${p.unreadCount})')),
-              ],
-              selected: {_unreadOnly},
-              onSelectionChanged: (s) => setState(() => _unreadOnly = s.first),
-            ),
-          ),
-          Expanded(
-            child: p.isLoading
-                ? const CommonLoadingWidget(skeleton: true)
-                : p.error != null
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Wide screen par side padding barhti hai taake content center rahe,
+          // lekin scroll area poori width leta hai (scrollbar screen ke edge par).
+          // Phone par side == AppSpacing.md, yani pehle jaisa.
+          final centered = (constraints.maxWidth - _maxContentWidth) / 2;
+          final side = centered > AppSpacing.md ? centered : AppSpacing.md;
+
+          return Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                    side, AppSpacing.md, side, AppSpacing.md),
+                child: SegmentedButton<bool>(
+                  segments: [
+                    const ButtonSegment(value: false, label: Text('All')),
+                    ButtonSegment(
+                        value: true, label: Text('Unread (${p.unreadCount})')),
+                  ],
+                  selected: {_unreadOnly},
+                  onSelectionChanged: (s) =>
+                      setState(() => _unreadOnly = s.first),
+                ),
+              ),
+              Expanded(
+                child: p.isLoading
+                    ? const CommonLoadingWidget(skeleton: true)
+                    : p.error != null
                     ? CommonErrorState(message: p.error!)
                     : list.isEmpty
-                        ? const CommonEmptyState(
-                            icon: Icons.notifications_none,
-                            title: 'No notifications',
-                            message: 'New assignments and updates will appear here.',
-                          )
-                        : ListView.separated(
-                            key: const PageStorageKey('notifications_list'),
-                            padding: EdgeInsets.fromLTRB(
-                                AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
-                            itemCount: list.length,
-                            separatorBuilder: (_, __) => SizedBox(height: AppSpacing.sm),
-                            itemBuilder: (_, i) => _Tile(
-                              item: list[i],
-                              onTap: () {
-                                final item = list[i];
-                                p.markRead(item.id);
-                                if (item.orderId != null && item.orderId!.isNotEmpty) {
-                                  final auth = context.read<AuthProvider>();
-                                  final isAdmin = auth.user?.role == UserRole.admin;
-                                  if (isAdmin) {
-                                    context.push(AppRoutes.adminOrder(item.orderId!));
-                                  } else {
-                                    context.push(AppRoutes.riderDelivery(item.orderId!));
-                                  }
-                                }
-                              },
-                            ),
-                          ),
-          ),
-        ],
+                    ? const CommonEmptyState(
+                  icon: Icons.notifications_none,
+                  title: 'No notifications',
+                  message:
+                  'New assignments and updates will appear here.',
+                )
+                    : ListView.separated(
+                  key: const PageStorageKey('notifications_list'),
+                  padding: EdgeInsets.fromLTRB(
+                      side, 0, side, AppSpacing.lg),
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) =>
+                      SizedBox(height: AppSpacing.sm),
+                  itemBuilder: (_, i) => _Tile(
+                    item: list[i],
+                    onTap: () {
+                      final item = list[i];
+                      p.markRead(item.id);
+                      if (item.orderId != null &&
+                          item.orderId!.isNotEmpty) {
+                        final auth = context.read<AuthProvider>();
+                        final isAdmin =
+                            auth.user?.role == UserRole.admin;
+                        if (isAdmin) {
+                          context.push(
+                              AppRoutes.adminOrder(item.orderId!));
+                        } else {
+                          context.push(AppRoutes.riderDelivery(
+                              item.orderId!));
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -110,8 +132,11 @@ class _Tile extends StatelessWidget {
         children: [
           Container(
             padding: EdgeInsets.all(8.w),
-            decoration: BoxDecoration(color: context.scheme.primary.withAlpha(30), shape: BoxShape.circle),
-            child: Icon(AppIcons.forNotification(item.type), size: 20.w, color: context.scheme.primary),
+            decoration: BoxDecoration(
+                color: context.scheme.primary.withAlpha(30),
+                shape: BoxShape.circle),
+            child: Icon(AppIcons.forNotification(item.type),
+                size: 20.w, color: context.scheme.primary),
           ),
           SizedBox(width: AppSpacing.sm + 4),
           Expanded(
@@ -122,15 +147,18 @@ class _Tile extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(item.title,
-                          style: context.text.titleSmall
-                              ?.copyWith(fontWeight: item.read ? FontWeight.w500 : FontWeight.w800)),
+                          style: context.text.titleSmall?.copyWith(
+                              fontWeight:
+                              item.read ? FontWeight.w500 : FontWeight.w800)),
                     ),
-                    if (!item.read) Icon(Icons.circle, size: 10.w, color: c.info),
+                    if (!item.read)
+                      Icon(Icons.circle, size: 10.w, color: c.info),
                   ],
                 ),
                 Text(item.body, style: context.text.bodyMedium),
                 SizedBox(height: AppSpacing.xs),
-                Text(DateTimeUtils.relative(item.createdAt), style: context.text.bodySmall),
+                Text(DateTimeUtils.relative(item.createdAt),
+                    style: context.text.bodySmall),
               ],
             ),
           ),

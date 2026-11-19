@@ -59,12 +59,20 @@ class FirestoreHelpers {
     });
   }
 
+  /// Efficiently calculates the next stop number for a rider by querying only active deliveries.
   Future<int> nextStop(String riderId) async {
-    final snap = await orders.where('riderId', isEqualTo: riderId).get();
+    final snap = await orders
+        .where('riderId', isEqualTo: riderId)
+        .where('status', whereIn: [
+          OrderStatus.assigned.name,
+          OrderStatus.pickedUp.name,
+          OrderStatus.outForDelivery.name,
+        ])
+        .get(const GetOptions(source: Source.serverAndCache));
     var max = 0;
     for (final d in snap.docs) {
       final o = DeliveryOrder.fromMap(d.data());
-      if (!o.status.isClosed && (o.stopNumber ?? 0) > max) max = o.stopNumber!;
+      if ((o.stopNumber ?? 0) > max) max = o.stopNumber!;
     }
     return max + 1;
   }

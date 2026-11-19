@@ -15,17 +15,81 @@ class FirebaseOrderRepository implements OrderRepository {
 
   FirebaseFirestore get _db => _h.db;
 
+  /// Bounded to recent 14-day operational window to prevent downloading old historical catalog on live snapshots.
   @override
-  Stream<List<DeliveryOrder>> watchAllOrders() => _h.orders
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((s) => s.docs.map((d) => DeliveryOrder.fromMap(d.data())).toList());
+  Stream<List<DeliveryOrder>> watchAllOrders() {
+    final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14)).millisecondsSinceEpoch;
+    return _h.orders
+        .where('createdAt', isGreaterThanOrEqualTo: fourteenDaysAgo)
+        .snapshots()
+        .map((s) {
+      final list = s.docs.map((d) => DeliveryOrder.fromMap(d.data())).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
+  }
 
+  /// Dedicated real-time stream of all active operational orders (unassigned, assigned, pickedUp, outForDelivery).
+  /// Excludes closed historical orders completely while ensuring no active order is ever hidden.
   @override
-  Stream<List<DeliveryOrder>> watchRiderOrders(String riderId) => _h.orders
-      .where('riderId', isEqualTo: riderId)
-      .snapshots()
-      .map((s) => s.docs.map((d) => DeliveryOrder.fromMap(d.data())).toList());
+  Stream<List<DeliveryOrder>> watchActiveOrders() {
+    return _h.orders
+        .where('status', whereIn: [
+          OrderStatus.unassigned.name,
+          OrderStatus.assigned.name,
+          OrderStatus.pickedUp.name,
+          OrderStatus.outForDelivery.name,
+        ])
+        .snapshots()
+        .map((s) {
+      final list = s.docs.map((d) => DeliveryOrder.fromMap(d.data())).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
+  }
+
+  /// Dedicated real-time stream of rider's active and recent orders (last 14 days).
+  /// Uses a single-field query ('riderId') so no composite index in Firebase Console is required.
+  @override
+  Stream<List<DeliveryOrder>> watchRiderOrders(String riderId) {
+    final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14)).millisecondsSinceEpoch;
+    return _h.orders
+        .where('riderId', isEqualTo: riderId)
+        .snapshots()
+        .map((s) {
+      final list = s.docs
+          .map((d) => DeliveryOrder.fromMap(d.data()))
+          .where((o) => o.createdAt.millisecondsSinceEpoch >= fourteenDaysAgo || o.status.isActive)
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
+  }
+
+  /// Cursor-based pagination for historical closed orders (delivered/failed).
+  @override
+  Future<List<DeliveryOrder>> fetchOrderHistory({
+    int limit = 20,
+    DeliveryOrder? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> query = _h.orders
+        .where('status', whereIn: [
+          OrderStatus.delivered.name,
+          OrderStatus.failed.name,
+        ]);
+
+    if (startAfter != null) {
+      final startDoc = await _h.orders.doc(startAfter.id).get();
+      if (startDoc.exists) {
+        query = query.startAfterDocument(startDoc);
+      }
+    }
+
+    final snap = await query.get(const GetOptions(source: Source.serverAndCache));
+    final list = snap.docs.map((d) => DeliveryOrder.fromMap(d.data())).toList();
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list.take(limit).toList();
+  }
 
   @override
   Future<DeliveryOrder> createOrder(DeliveryOrder draft, String byUid) async {

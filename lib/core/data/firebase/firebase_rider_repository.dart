@@ -12,46 +12,8 @@ class FirebaseRiderRepository implements RiderRepository {
 
   @override
   Stream<List<Rider>> watchRiders() {
-    return _db.collection('users').where('role', isEqualTo: 'rider').snapshots().asyncMap((userSnap) async {
-      final userDocs = userSnap.docs;
-      final ridersMap = <String, Rider>{};
-
-      // 1. Fetch existing riders collection docs
-      try {
-        final riderSnap = await _riders.get();
-        for (final doc in riderSnap.docs) {
-          final data = doc.data();
-          final r = Rider.fromMap(data);
-          ridersMap[r.id] = r;
-        }
-      } catch (e) {
-        debugPrint('watchRiders riders fetch notice: $e');
-      }
-
-      // 2. Ensure every user with role == 'rider' has a rider entry
-      for (final uDoc in userDocs) {
-        final uData = uDoc.data();
-        final uid = uDoc.id;
-        if (!ridersMap.containsKey(uid)) {
-          final name = uData['name'] ?? uData['email']?.toString().split('@').first ?? 'Rider';
-          final email = uData['email'] ?? '';
-          final staffId = uData['staffId'] ?? 'R${uid.substring(0, 4).toUpperCase()}';
-          final newRider = Rider(
-            id: uid,
-            staffId: staffId,
-            name: name,
-            phone: uData['phone'] ?? '+92 300 0000000',
-            email: email,
-            dutyStatus: DutyStatus.onDuty,
-            vehicleType: 'Bike - CG125',
-            vehicleReg: 'ICT-408',
-          );
-          ridersMap[uid] = newRider;
-          _riders.doc(uid).set(newRider.toMap(), SetOptions(merge: true)).catchError((_) {});
-        }
-      }
-
-      return ridersMap.values.toList();
+    return _riders.snapshots().map((riderSnap) {
+      return riderSnap.docs.map((d) => Rider.fromMap(d.data())).toList();
     });
   }
 

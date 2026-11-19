@@ -11,8 +11,31 @@ class MockOrderRepository implements OrderRepository {
   Stream<List<DeliveryOrder>> watchAllOrders() => _s.orders.watch();
 
   @override
+  Stream<List<DeliveryOrder>> watchActiveOrders() =>
+      _s.orders.watch().map((l) => l.where((o) => o.status.isActive || o.status == OrderStatus.unassigned).toList());
+
+  @override
   Stream<List<DeliveryOrder>> watchRiderOrders(String riderId) =>
       _s.orders.watch().map((l) => l.where((o) => o.riderId == riderId).toList());
+
+  @override
+  Future<List<DeliveryOrder>> fetchOrderHistory({
+    int limit = 20,
+    DeliveryOrder? startAfter,
+  }) async {
+    final list = _s.orders.watch().first;
+    final all = await list;
+    final closed = all.where((o) => o.status.isClosed).toList();
+    closed.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (startAfter != null) {
+      final index = closed.indexWhere((o) => o.id == startAfter.id);
+      if (index != -1 && index + 1 < closed.length) {
+        return closed.skip(index + 1).take(limit).toList();
+      }
+      return [];
+    }
+    return closed.take(limit).toList();
+  }
 
   @override
   Future<DeliveryOrder> createOrder(DeliveryOrder draft, String byUid) async {

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -7,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/core.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../authentication/providers/auth_provider.dart';
 import '../../providers/admin_providers.dart';
 
@@ -29,9 +31,12 @@ class AdminProfileScreen extends StatelessWidget {
 
   Future<void> _showPhotoOptions(BuildContext context, AppUser? user) async {
     final hasPhoto = user?.photoUrl != null && user!.photoUrl!.isNotEmpty;
+    // Web par camera aur crop UI kaam nahi karte, isliye wahan sirf gallery.
+    final canUseCamera = !kIsWeb;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      constraints: Responsive.sheetConstraints(),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
@@ -50,15 +55,16 @@ class AdminProfileScreen extends StatelessWidget {
                   _pickAndCropImage(context, ImageSource.gallery);
                 },
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.photo_camera_outlined, color: context.scheme.primary),
-                title: const Text('Take a Photo'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndCropImage(context, ImageSource.camera);
-                },
-              ),
+              if (canUseCamera)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.photo_camera_outlined, color: context.scheme.primary),
+                  title: const Text('Take a Photo'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickAndCropImage(context, ImageSource.camera);
+                  },
+                ),
               if (hasPhoto)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -116,20 +122,23 @@ class AdminProfileScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Preview Profile Picture'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipOval(
-              child: Image.file(
-                imageFile,
-                width: 140.w,
-                height: 140.w,
-                fit: BoxFit.cover,
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipOval(
+                child: Image.file(
+                  imageFile,
+                  width: 140.w,
+                  height: 140.w,
+                  fit: BoxFit.cover,
+                ),
               ),
-            ),
-            SizedBox(height: AppSpacing.md),
-            const Text('Would you like to upload this picture as your new profile photo?'),
-          ],
+              SizedBox(height: AppSpacing.md),
+              const Text('Would you like to upload this picture as your new profile photo?'),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -223,131 +232,136 @@ class AdminProfileScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: const CommonAppBar(title: 'Admin Profile & Settings'),
-      body: RefreshIndicator(
-        onRefresh: () async => await Future.delayed(const Duration(milliseconds: 500)),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.all(AppSpacing.md),
-          children: [
-          // Profile Header Card
-          CommonCard(
-            child: Column(
-              children: [
-                CommonProfileAvatar(
-                  name: user?.name ?? 'Dispatcher Admin',
-                  photoUrl: user?.photoUrl,
-                  size: 72,
-                  showEditBadge: true,
-                  onTap: () => _showPhotoOptions(context, user),
-                ),
-                SizedBox(height: AppSpacing.sm),
-                Text(user?.name ?? 'Dispatcher Admin', style: context.text.titleLarge),
-                SizedBox(height: 2.h),
-                Text(user?.email ?? 'admin@company.com', style: context.text.bodySmall),
-                SizedBox(height: AppSpacing.xs),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(30),
-                    borderRadius: BorderRadius.circular(AppRadius.chip),
-                  ),
-                  child: Text('FLEET DISPATCHER / ADMIN', style: context.text.labelSmall?.copyWith(color: primaryColor, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: AppSpacing.md),
-
-          // Operational Performance Overview
-          const CommonSectionHeader('Operational System Overview'),
-          SizedBox(height: AppSpacing.xs),
-          CommonCard(
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: ResponsivePad(
+        maxWidth: 800,
+        builder: (context, pad) => RefreshIndicator(
+          onRefresh: () async => await Future.delayed(const Duration(milliseconds: 500)),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: pad + EdgeInsets.all(AppSpacing.md),
+            children: [
+              // Profile Header Card
+              CommonCard(
+                child: Column(
                   children: [
-                    Text('Managed Dispatches', style: context.text.bodyMedium),
-                    Text('${dash.totalOrders}', style: context.text.titleSmall),
+                    CommonProfileAvatar(
+                      name: user?.name ?? 'Dispatcher Admin',
+                      photoUrl: user?.photoUrl,
+                      size: 72,
+                      showEditBadge: true,
+                      onTap: () => _showPhotoOptions(context, user),
+                    ),
+                    SizedBox(height: AppSpacing.sm),
+                    Text(user?.name ?? 'Dispatcher Admin', style: context.text.titleLarge),
+                    SizedBox(height: 2.h),
+                    Text(user?.email ?? 'admin@company.com', style: context.text.bodySmall),
+                    SizedBox(height: AppSpacing.xs),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withAlpha(30),
+                        borderRadius: BorderRadius.circular(AppRadius.chip),
+                      ),
+                      child: Text('FLEET DISPATCHER / ADMIN', style: context.text.labelSmall?.copyWith(color: primaryColor, fontWeight: FontWeight.bold)),
+                    ),
                   ],
                 ),
-                const Divider(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ),
+              SizedBox(height: AppSpacing.md),
+
+              // Operational Performance Overview
+              const CommonSectionHeader('Operational System Overview'),
+              SizedBox(height: AppSpacing.xs),
+              CommonCard(
+                child: Column(
                   children: [
-                    Text('Active Fleet Size', style: context.text.bodyMedium),
-                    Text('${dash.riders.length} Riders', style: context.text.titleSmall),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Managed Dispatches', style: context.text.bodyMedium),
+                        Text('${dash.totalOrders}', style: context.text.titleSmall),
+                      ],
+                    ),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Active Fleet Size', style: context.text.bodyMedium),
+                        Text('${dash.riders.length} Riders', style: context.text.titleSmall),
+                      ],
+                    ),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('SLA Success Rate', style: context.text.bodyMedium),
+                        Text('${dash.slaSuccessRate.toStringAsFixed(1)}%', style: context.text.titleSmall?.copyWith(color: c.success)),
+                      ],
+                    ),
                   ],
                 ),
-                const Divider(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('SLA Success Rate', style: context.text.bodyMedium),
-                    Text('${dash.slaSuccessRate.toStringAsFixed(1)}%', style: context.text.titleSmall?.copyWith(color: c.success)),
+              ),
+              SizedBox(height: AppSpacing.md),
+
+              // App Accent Color Palette Picker
+              const CommonSectionHeader('App Accent Color Theme'),
+              SizedBox(height: AppSpacing.xs),
+              CommonCard(
+                child: Wrap(
+                  alignment: WrapAlignment.spaceAround,
+                  runSpacing: 12,
+                  spacing: 16,
+                  children: const [
+                    _ColorOption(Color(0xFF3B82F6), 'Blue'),
+                    _ColorOption(Color(0xFF16A34A), 'Green'),
+                    _ColorOption(Color(0xFFF472B6), 'Pink'),
+                    _ColorOption(Color(0xFF7C3AED), 'Purple'),
+                    _ColorOption(Color(0xFFFB923C), 'Orange'),
                   ],
                 ),
-              ],
-            ),
-          ),
-          SizedBox(height: AppSpacing.md),
+              ),
+              SizedBox(height: AppSpacing.md),
 
-          // App Accent Color Palette Picker
-          const CommonSectionHeader('App Accent Color Theme'),
-          SizedBox(height: AppSpacing.xs),
-          CommonCard(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                _ColorOption(Color(0xFF3B82F6), 'Blue'),
-                _ColorOption(Color(0xFF16A34A), 'Green'),
-                _ColorOption(Color(0xFFF472B6), 'Pink'),
-                _ColorOption(Color(0xFF7C3AED), 'Purple'),
-                _ColorOption(Color(0xFFFB923C), 'Orange'),
-              ],
-            ),
-          ),
-          SizedBox(height: AppSpacing.md),
-
-          // Settings Section
-          const CommonSectionHeader('System Settings'),
-          SizedBox(height: AppSpacing.xs),
-          CommonCard(
-            child: Column(
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.dark_mode_outlined),
-                  title: const Text('Dark Mode Theme'),
-                  trailing: Switch(
-                    value: themeProv.isDark(context),
-                    onChanged: (val) => themeProv.setDark(val),
-                  ),
+              // Settings Section
+              const CommonSectionHeader('System Settings'),
+              SizedBox(height: AppSpacing.xs),
+              CommonCard(
+                child: Column(
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.dark_mode_outlined),
+                      title: const Text('Dark Mode Theme'),
+                      trailing: Switch(
+                        value: themeProv.isDark(context),
+                        onChanged: (val) => themeProv.setDark(val),
+                      ),
+                    ),
+                    const Divider(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.sync_rounded),
+                      title: const Text('Real-Time Cloud Sync'),
+                      subtitle: const Text('Firebase Firestore live telemetry connected'),
+                      trailing: Icon(Icons.check_circle_rounded, color: c.success),
+                    ),
+                  ],
                 ),
-                const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.sync_rounded),
-                  title: const Text('Real-Time Cloud Sync'),
-                  subtitle: const Text('Firebase Firestore live telemetry connected'),
-                  trailing: Icon(Icons.check_circle_rounded, color: c.success),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: AppSpacing.lg),
+              ),
+              SizedBox(height: AppSpacing.lg),
 
-          // Logout Button
-          CommonButton(
-            label: 'Sign Out Admin',
-            icon: Icons.logout_rounded,
-            variant: CommonButtonVariant.secondary,
-            onPressed: () => _confirmSignOut(context),
+              // Logout Button
+              CommonButton(
+                label: 'Sign Out Admin',
+                icon: Icons.logout_rounded,
+                variant: CommonButtonVariant.secondary,
+                onPressed: () => _confirmSignOut(context),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
   }
 }
 

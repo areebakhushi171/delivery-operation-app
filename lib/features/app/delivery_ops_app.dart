@@ -1,6 +1,4 @@
-
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -12,6 +10,7 @@ import '../../core/storage/local_storage.dart';
 import '../../core/theme/dark_theme.dart';
 import '../../core/theme/app_background.dart';
 import '../../core/theme/light_theme.dart';
+import '../../core/utils/responsive.dart';
 import '../../features/admin/providers/admin_providers.dart';
 import '../authentication/providers/auth_provider.dart';
 import '../rider/deliveries/providers/rider_orders_provider.dart';
@@ -140,48 +139,60 @@ class DeliveryOpsApp extends StatelessWidget {
           },
         ),
 
-        // Admin Orders
-        ChangeNotifierProxyProvider<AuthProvider, AdminOrdersProvider>(
-          create: (_) => AdminOrdersProvider(
+        // Admin Orders: shares order and rider streams from AdminDashboardProvider
+        ChangeNotifierProxyProvider2<
+            AuthProvider,
+            AdminDashboardProvider,
+            AdminOrdersProvider>(
+          create: (context) => AdminOrdersProvider(
             repositories.orders,
-            repositories.riders,
+            context.read<AdminDashboardProvider>(),
           ),
-          update: (context, auth, previous) {
+          update: (context, auth, dashboard, previous) {
             final prov = previous ??
                 AdminOrdersProvider(
                   repositories.orders,
-                  repositories.riders,
+                  dashboard,
                 );
 
-            prov.bind(auth.user);
+            prov.bind(auth.user, dashboard);
             return prov;
           },
         ),
 
-        // Admin Exceptions
-        ChangeNotifierProxyProvider<AuthProvider, AdminExceptionsProvider>(
-          create: (_) => AdminExceptionsProvider(repositories.exceptions),
-          update: (context, auth, previous) {
+        // Admin Exceptions: shares exception stream from AdminDashboardProvider
+        ChangeNotifierProxyProvider2<
+            AuthProvider,
+            AdminDashboardProvider,
+            AdminExceptionsProvider>(
+          create: (context) => AdminExceptionsProvider(
+            repositories.exceptions,
+            context.read<AdminDashboardProvider>(),
+          ),
+          update: (context, auth, dashboard, previous) {
             final prov = previous ??
-                AdminExceptionsProvider(repositories.exceptions);
+                AdminExceptionsProvider(
+                  repositories.exceptions,
+                  dashboard,
+                );
 
-            prov.bind(auth.user);
+            prov.bind(auth.user, dashboard);
             return prov;
           },
         ),
       ],
-      child: ScreenUtilInit(
-        designSize: const Size(375, 812),
-        minTextAdapt: true,
-        splitScreenMode: true,
-        builder: (context, child) => const _AppView(),
-      ),
+      // ScreenUtilInit ab _AppView ke andar hai (neeche wajah likhi hai).
+      child: const _AppView(),
     );
   }
 }
 
 /// Router is created once and reused.
 /// Authentication changes are handled through the router refresh listener.
+///
+/// ResponsiveScreenUtilInit yahan MaterialApp.router ke around hai, upar nahi:
+/// breakpoint (phone/tablet/desktop) badalne par wo apne child ko rebuild karta hai,
+/// aur router state mein rehne ki wajah se current page / navigation stack safe rehta hai.
 class _AppView extends StatefulWidget {
   const _AppView();
 
@@ -189,17 +200,27 @@ class _AppView extends StatefulWidget {
   State<_AppView> createState() => _AppViewState();
 }
 
-class _AppViewState extends State<_AppView> {
+class _AppViewState extends State<_AppView> with WidgetsBindingObserver {
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _router = createAppRouter(context.read<AuthProvider>());
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-verify network & location status on foreground return
+      context.read<SyncProvider>().init();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _router.dispose();
     super.dispose();
   }
@@ -208,15 +229,17 @@ class _AppViewState extends State<_AppView> {
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
 
-    return MaterialApp.router(
-      title: 'Delivery Operations Companion',
-      debugShowCheckedModeBanner: false,
-      theme: lightTheme(themeProvider.accentColor),
-      darkTheme: darkTheme(themeProvider.accentColor),
-      themeMode: themeProvider.mode,
-      routerConfig: _router,
-      // Sky-blue gradient behind every screen (scaffolds are transparent).
-      builder: (context, child) => AppBackground(child: child ?? const SizedBox.shrink()),
+    return ResponsiveScreenUtilInit(
+      builder: (context, child) => MaterialApp.router(
+        title: 'Delivery Operations Companion',
+        debugShowCheckedModeBanner: false,
+        theme: lightTheme(themeProvider.accentColor),
+        darkTheme: darkTheme(themeProvider.accentColor),
+        themeMode: themeProvider.mode,
+        routerConfig: _router,
+        // Sky-blue gradient behind every screen (scaffolds are transparent).
+        builder: (context, child) => AppBackground(child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }

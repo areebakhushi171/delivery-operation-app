@@ -14,11 +14,11 @@ class LocationService {
     return LocationAccess.granted;
   }
 
-  /// Battery-conscious: only emits after moving 30 m.
+  /// Battery-conscious: emits position updates with 10m distance filter.
   Stream<Position> positions() => Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 30,
+          distanceFilter: 10,
         ),
       );
 

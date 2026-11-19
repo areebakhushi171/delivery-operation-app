@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/core.dart';
 import '../../../../core/providers/notifications_provider.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../core/utils/scroll_reset.dart';
 import '../../../../widgets/greeting_header.dart';
 import '../../../authentication/providers/auth_provider.dart';
@@ -48,30 +49,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Scroll
     final sections = _sections(context, dash);
 
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: () async => await Future.delayed(const Duration(milliseconds: 500)),
-        child: ListView(
-          controller: scrollController, // scroll reset controller (PageStorageKey removed)
-          padding: EdgeInsets.zero,
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            GreetingHeader(
-              userName: user?.name ?? 'Admin',
-              unread: unread,
-              onNotifications: () => context.push(AppRoutes.adminNotifications),
-              onProfile: () => context.push(AppRoutes.adminProfile),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.xl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < sections.length; i++)
-                    sections[i].animate().fadeIn(delay: (50 * i).ms, duration: 350.ms),
-                ],
+      body: ResponsivePad(
+        maxWidth: 1400,
+        builder: (context, pad) => RefreshIndicator(
+          onRefresh: () async => await Future.delayed(const Duration(milliseconds: 500)),
+          child: ListView(
+            controller: scrollController, // scroll reset controller (PageStorageKey removed)
+            padding: pad,
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              GreetingHeader(
+                userName: user?.name ?? 'Admin',
+                unread: unread,
+                onNotifications: () => context.push(AppRoutes.adminNotifications),
+                onProfile: () => context.push(AppRoutes.adminProfile),
               ),
-            ),
-          ],
+              Padding(
+                padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.xl),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < sections.length; i++)
+                      sections[i].animate().fadeIn(delay: (50 * i).ms, duration: 350.ms),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -88,6 +92,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Scroll
     final top = stats.topRider;
     final busiest = stats.busiestDay;
     final fastest = stats.fastestMinutes;
+    final wide = Responsive.isWide(context);
 
     return [
       // ---- Hero summary ----
@@ -103,7 +108,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Scroll
           values: stats.deliveredPerDay(30),
           xLabels: AdminStats.dayLabels(30),
           color: c.success,
-          height: 150,
+          height: wide ? 220 : 150,
           format: (v) => '${v.round()} delivered',
         ),
       ),
@@ -112,51 +117,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Scroll
       // ---- Status waveform cards ----
       CommonSectionHeader('Order Pipeline',
           actionLabel: 'More Details', onAction: () => context.go(AppRoutes.adminOrders)),
-      SizedBox(
+      AdaptiveHList(
         height: 196.h,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          clipBehavior: Clip.none,
-          children: [
-            WaveformCard(
-              title: 'Pending',
-              value: dash.pendingOrders,
-              status: dash.unassignedOrders > 0 ? '${dash.unassignedOrders} unassigned' : 'Assigned',
-              color: AppColors.orange,
-              series: AdminStats.hourBuckets(stats.byStatus(
-                      (s) => s == OrderStatus.assigned || s == OrderStatus.unassigned)),
-              onTap: () => context.go(AppRoutes.adminOrders),
-            ),
-            SizedBox(width: 12.w),
-            WaveformCard(
-              title: 'On the Way',
-              value: stats.inTransit,
-              status: stats.inTransit == 0 ? 'Idle' : 'Moving',
-              color: primary,
-              series: AdminStats.hourBuckets(stats.byStatus(
-                      (s) => s == OrderStatus.pickedUp || s == OrderStatus.outForDelivery)),
-              onTap: () => context.go(AppRoutes.adminOrders),
-            ),
-            SizedBox(width: 12.w),
-            WaveformCard(
-              title: 'Delivered',
-              value: dash.completedOrders,
-              status: dash.slaSuccessRate >= 80 ? 'On track' : 'Watch SLA',
-              color: AppColors.lightGreen,
-              series: stats.deliveredPerDay(7),
-              onTap: () => context.go(AppRoutes.adminOrders),
-            ),
-            SizedBox(width: 12.w),
-            WaveformCard(
-              title: 'Failed',
-              value: dash.failedOrders,
-              status: dash.failedOrders == 0 ? 'None' : 'Review',
-              color: AppColors.pink,
-              series: AdminStats.hourBuckets(stats.byStatus((s) => s == OrderStatus.failed)),
-              onTap: () => context.go(AppRoutes.adminExceptions),
-            ),
-          ],
-        ),
+        children: [
+          WaveformCard(
+            title: 'Pending',
+            value: dash.pendingOrders,
+            status: dash.unassignedOrders > 0 ? '${dash.unassignedOrders} unassigned' : 'Assigned',
+            color: AppColors.orange,
+            series: AdminStats.hourBuckets(stats.byStatus(
+                    (s) => s == OrderStatus.assigned || s == OrderStatus.unassigned)),
+            onTap: () => context.go(AppRoutes.adminOrders),
+          ),
+          WaveformCard(
+            title: 'On the Way',
+            value: stats.inTransit,
+            status: stats.inTransit == 0 ? 'Idle' : 'Moving',
+            color: primary,
+            series: AdminStats.hourBuckets(stats.byStatus(
+                    (s) => s == OrderStatus.pickedUp || s == OrderStatus.outForDelivery)),
+            onTap: () => context.go(AppRoutes.adminOrders),
+          ),
+          WaveformCard(
+            title: 'Delivered',
+            value: dash.completedOrders,
+            status: dash.slaSuccessRate >= 80 ? 'On track' : 'Watch SLA',
+            color: AppColors.lightGreen,
+            series: stats.deliveredPerDay(7),
+            onTap: () => context.go(AppRoutes.adminOrders),
+          ),
+          WaveformCard(
+            title: 'Failed',
+            value: dash.failedOrders,
+            status: dash.failedOrders == 0 ? 'None' : 'Review',
+            color: AppColors.pink,
+            series: AdminStats.hourBuckets(stats.byStatus((s) => s == OrderStatus.failed)),
+            onTap: () => context.go(AppRoutes.adminExceptions),
+          ),
+        ],
       ),
 
       // ---- SLA + fleet progress ----
@@ -184,42 +182,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Scroll
       // ---- Highlights ----
       if (top != null || busiest != null || fastest != null) ...[
         const CommonSectionHeader('Highlights'),
-        SizedBox(
+        AdaptiveHList(
           height: 128.h,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
-            children: [
-              if (top != null) ...[
-                HighlightCard(
-                  icon: Icons.emoji_events_outlined,
-                  label: 'Top Rider',
-                  value: top.name.split(' ').first,
-                  caption: '${top.count} deliveries',
-                  color: AppColors.orange,
-                ),
-                SizedBox(width: 12.w),
-              ],
-              if (busiest != null) ...[
-                HighlightCard(
-                  icon: Icons.calendar_month_outlined,
-                  label: 'Busiest Day',
-                  value: busiest.day,
-                  caption: '${busiest.count} orders created',
-                  color: primary,
-                ),
-                SizedBox(width: 12.w),
-              ],
-              if (fastest != null)
-                HighlightCard(
-                  icon: Icons.bolt_rounded,
-                  label: 'Fastest Delivery',
-                  value: fastest >= 60 ? '${fastest ~/ 60}h ${fastest % 60}m' : '$fastest min',
-                  caption: 'Best time on record',
-                  color: c.success,
-                ),
-            ],
-          ),
+          children: [
+            if (top != null)
+              HighlightCard(
+                icon: Icons.emoji_events_outlined,
+                label: 'Top Rider',
+                value: top.name.split(' ').first,
+                caption: '${top.count} deliveries',
+                color: AppColors.orange,
+              ),
+            if (busiest != null)
+              HighlightCard(
+                icon: Icons.calendar_month_outlined,
+                label: 'Busiest Day',
+                value: busiest.day,
+                caption: '${busiest.count} orders created',
+                color: primary,
+              ),
+            if (fastest != null)
+              HighlightCard(
+                icon: Icons.bolt_rounded,
+                label: 'Fastest Delivery',
+                value: fastest >= 60 ? '${fastest ~/ 60}h ${fastest % 60}m' : '$fastest min',
+                caption: 'Best time on record',
+                color: c.success,
+              ),
+          ],
         ),
       ],
 

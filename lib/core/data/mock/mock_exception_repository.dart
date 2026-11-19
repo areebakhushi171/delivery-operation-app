@@ -11,8 +11,30 @@ class MockExceptionRepository implements ExceptionRepository {
   Stream<List<DeliveryException>> watchAll() => _s.exceptions.watch();
 
   @override
+  Stream<List<DeliveryException>> watchActiveExceptions() =>
+      _s.exceptions.watch().map((l) => l.where((e) => e.status.isOpen).toList());
+
+  @override
   Stream<List<DeliveryException>> watchForRider(String riderId) =>
       _s.exceptions.watch().map((l) => l.where((e) => e.riderId == riderId).toList());
+
+  @override
+  Future<List<DeliveryException>> fetchExceptionHistory({
+    int limit = 20,
+    DeliveryException? startAfter,
+  }) async {
+    final list = await _s.exceptions.watch().first;
+    final closed = list.where((e) => !e.status.isOpen).toList();
+    closed.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+    if (startAfter != null) {
+      final index = closed.indexWhere((e) => e.id == startAfter.id);
+      if (index != -1 && index + 1 < closed.length) {
+        return closed.skip(index + 1).take(limit).toList();
+      }
+      return [];
+    }
+    return closed.take(limit).toList();
+  }
 
   @override
   Future<void> report(DeliveryException exception, String byUid) async {

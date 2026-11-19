@@ -16,99 +16,83 @@ class DeliveriesScreen extends StatelessWidget {
     final p = context.watch<RiderOrdersProvider>();
     final list = p.filtered;
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFB8D9F5),
-            Color(0xFFDCEBFA),
-            Color(0xFFF4F7FB),
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: const CommonAppBar(title: "Today's Deliveries", showBack: false),
-          body: KeyboardDismissOnTap(
-            child: RefreshIndicator(
-              onRefresh: p.refresh,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        // Top Summary Card with colored donut ring & legend
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.sm),
-                          child: _DeliveriesSummaryCard(p: p),
-                        ),
-                        // Search bar
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, AppSpacing.sm),
-                          child: CommonSearchField(hint: 'Search orders...', onChanged: p.setQuery),
-                        ),
-                        // Filter pills row (All, Pending, In Transit, Delivered, Failed)
-                        SizedBox(
-                          height: 44.h,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
-                            children: [
-                              _filterPill(context, p, RiderStatusFilter.all, 'All'),
-                              SizedBox(width: 8.w),
-                              _filterPill(context, p, RiderStatusFilter.pending, 'Pending'),
-                              SizedBox(width: 8.w),
-                              _filterPill(context, p, RiderStatusFilter.inTransit, 'In Transit'),
-                              SizedBox(width: 8.w),
-                              _filterPill(context, p, RiderStatusFilter.delivered, 'Delivered'),
-                              SizedBox(width: 8.w),
-                              _filterPill(context, p, RiderStatusFilter.failed, 'Failed'),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: AppSpacing.sm),
-                      ],
+    return Scaffold(
+      appBar: const CommonAppBar(title: "Today's Deliveries", showBack: false),
+      body: KeyboardDismissOnTap(
+        child: RefreshIndicator(
+          onRefresh: p.refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    // Top Summary Card with colored donut ring & legend
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.sm),
+                      child: _DeliveriesSummaryCard(p: p),
+                    ),
+                    // Search bar
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, AppSpacing.sm),
+                      child: CommonSearchField(hint: 'Search orders...', onChanged: p.setQuery),
+                    ),
+                    // Filter pills row (All, Pending, In Transit, Delivered, Failed)
+                    SizedBox(
+                      height: 44.h,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
+                        children: [
+                          _filterPill(context, p, RiderStatusFilter.all, 'All'),
+                          SizedBox(width: 8.w),
+                          _filterPill(context, p, RiderStatusFilter.pending, 'Pending'),
+                          SizedBox(width: 8.w),
+                          _filterPill(context, p, RiderStatusFilter.inTransit, 'In Transit'),
+                          SizedBox(width: 8.w),
+                          _filterPill(context, p, RiderStatusFilter.delivered, 'Delivered'),
+                          SizedBox(width: 8.w),
+                          _filterPill(context, p, RiderStatusFilter.failed, 'Failed'),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.sm),
+                  ],
+                ),
+              ),
+              if (p.isLoadingInitial)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: CommonLoadingWidget(skeleton: true),
+                )
+              else if (p.error != null)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: CommonErrorState(message: p.error!, onRetry: p.refresh),
+                )
+              else if (list.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: CommonEmptyState(
+                    icon: Icons.local_shipping_outlined,
+                    title: 'No deliveries found',
+                    message: 'Try a different filter or pull down to refresh.',
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, 96.h),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) => Padding(
+                        padding: EdgeInsets.only(bottom: AppSpacing.gap),
+                        child: DeliveryCard(order: list[i]),
+                      ),
+                      childCount: list.length,
                     ),
                   ),
-                  if (p.isLoadingInitial)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: CommonLoadingWidget(skeleton: true),
-                    )
-                  else if (p.error != null)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: CommonErrorState(message: p.error!, onRetry: p.refresh),
-                    )
-                  else if (list.isEmpty)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: CommonEmptyState(
-                        icon: Icons.local_shipping_outlined,
-                        title: 'No deliveries found',
-                        message: 'Try a different filter or pull down to refresh.',
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: EdgeInsets.fromLTRB(AppSpacing.screen, 0, AppSpacing.screen, 96.h),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, i) => Padding(
-                            padding: EdgeInsets.only(bottom: AppSpacing.gap),
-                            child: DeliveryCard(order: list[i]),
-                          ),
-                          childCount: list.length,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -117,20 +101,25 @@ class DeliveriesScreen extends StatelessWidget {
 
   Widget _filterPill(BuildContext context, RiderOrdersProvider p, RiderStatusFilter filter, String label) {
     final isSelected = p.filter == filter;
+    final primary = Theme.of(context).colorScheme.primary;
+    final cardColor = context.appColors.card;
+    final borderColor = isSelected ? primary : context.appColors.border;
+    final textColor = isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface;
+
     return GestureDetector(
       onTap: () => p.setFilter(filter),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF3B82F6) : Colors.white.withOpacity(0.7),
+          color: isSelected ? primary : cardColor,
           borderRadius: BorderRadius.circular(22.r),
           border: Border.all(
-            color: isSelected ? const Color(0xFF3B82F6) : Colors.white.withOpacity(0.6),
+            color: borderColor,
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: isSelected ? const Color(0xFF3B82F6).withOpacity(0.3) : Colors.black.withOpacity(0.04),
+              color: isSelected ? primary.withValues(alpha: 0.3) : context.appColors.shadow,
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -140,7 +129,7 @@ class DeliveriesScreen extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: isSelected ? Colors.white : const Color(0xFF111827),
+              color: textColor,
               fontSize: 14.sp,
               fontWeight: FontWeight.w600,
             ),
@@ -168,6 +157,10 @@ class _DeliveriesSummaryCard extends StatelessWidget {
     const cDelivered = Color(0xFF16A34A);
     const cFailed = Color(0xFFEC4899);
 
+    final trackColor = context.appColors.border;
+    final textPrimary = Theme.of(context).colorScheme.onSurface;
+    final textSecondary = Theme.of(context).colorScheme.onSurfaceVariant;
+
     return GlassCard(
       child: Row(
         children: [
@@ -181,7 +174,7 @@ class _DeliveriesSummaryCard extends StatelessWidget {
                   size: const Size(112, 112),
                   painter: _DonutPainter(
                     strokeWidth: 12,
-                    trackColor: const Color(0xFFE2E8F0),
+                    trackColor: trackColor,
                     segments: [
                       _Segment(pending.toDouble(), cPending),
                       _Segment(inTransit.toDouble(), cTransit),
@@ -200,19 +193,19 @@ class _DeliveriesSummaryCard extends StatelessWidget {
                       children: [
                         Text(
                           '$total',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 30,
                             height: 1.1,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF111827),
+                            color: textPrimary,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'today',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF4B5563),
+                            color: textSecondary,
                           ),
                         ),
                       ],
@@ -227,13 +220,13 @@ class _DeliveriesSummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _legendRow(cPending, 'Pending', pending),
+                _legendRow(context, cPending, 'Pending', pending),
                 const SizedBox(height: 6),
-                _legendRow(cTransit, 'In transit', inTransit),
+                _legendRow(context, cTransit, 'In transit', inTransit),
                 const SizedBox(height: 6),
-                _legendRow(cDelivered, 'Delivered', delivered),
+                _legendRow(context, cDelivered, 'Delivered', delivered),
                 const SizedBox(height: 6),
-                _legendRow(cFailed, 'Failed', failed),
+                _legendRow(context, cFailed, 'Failed', failed),
               ],
             ),
           ),
@@ -242,7 +235,9 @@ class _DeliveriesSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _legendRow(Color color, String label, int count) {
+  Widget _legendRow(BuildContext context, Color color, String label, int count) {
+    final textPrimary = Theme.of(context).colorScheme.onSurface;
+    final textSecondary = Theme.of(context).colorScheme.onSurfaceVariant;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -254,10 +249,10 @@ class _DeliveriesSummaryCard extends StatelessWidget {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563), fontWeight: FontWeight.w500)),
+            Text(label, style: TextStyle(fontSize: 13, color: textSecondary, fontWeight: FontWeight.w500)),
           ],
         ),
-        Text('$count', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF111827))),
+        Text('$count', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimary)),
       ],
     );
   }

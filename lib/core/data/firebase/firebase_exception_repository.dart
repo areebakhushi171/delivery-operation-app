@@ -14,17 +14,77 @@ class FirebaseExceptionRepository implements ExceptionRepository {
 
   FirebaseFirestore get _db => _h.db;
 
+  /// Bounded to recent 14-day operational window to avoid loading old exception archives on live snapshots.
   @override
-  Stream<List<DeliveryException>> watchAll() => _h.exceptions
-      .orderBy('reportedAt', descending: true)
-      .snapshots()
-      .map((s) => s.docs.map((d) => DeliveryException.fromMap(d.data())).toList());
+  Stream<List<DeliveryException>> watchAll() {
+    final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14)).millisecondsSinceEpoch;
+    return _h.exceptions
+        .where('reportedAt', isGreaterThanOrEqualTo: fourteenDaysAgo)
+        .snapshots()
+        .map((s) {
+      final list = s.docs.map((d) => DeliveryException.fromMap(d.data())).toList();
+      list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+      return list;
+    });
+  }
 
+  /// Real-time stream of open/pending delivery exceptions ('reported').
   @override
-  Stream<List<DeliveryException>> watchForRider(String riderId) => _h.exceptions
-      .where('riderId', isEqualTo: riderId)
-      .snapshots()
-      .map((s) => s.docs.map((d) => DeliveryException.fromMap(d.data())).toList());
+  Stream<List<DeliveryException>> watchActiveExceptions() {
+    return _h.exceptions
+        .where('status', isEqualTo: ExceptionStatus.reported.name)
+        .snapshots()
+        .map((s) {
+      final list = s.docs.map((d) => DeliveryException.fromMap(d.data())).toList();
+      list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+      return list;
+    });
+  }
+
+  /// Real-time stream of rider's active and recent exceptions (last 14 days).
+  /// Uses a single-field query ('riderId') so no composite index in Firebase Console is required.
+  @override
+  Stream<List<DeliveryException>> watchForRider(String riderId) {
+    final fourteenDaysAgo = DateTime.now().subtract(const Duration(days: 14)).millisecondsSinceEpoch;
+    return _h.exceptions
+        .where('riderId', isEqualTo: riderId)
+        .snapshots()
+        .map((s) {
+      final list = s.docs
+          .map((d) => DeliveryException.fromMap(d.data()))
+          .where((e) => e.reportedAt.millisecondsSinceEpoch >= fourteenDaysAgo || e.status.isOpen)
+          .toList();
+      list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+      return list;
+    });
+  }
+
+  /// Cursor-based pagination for historical/closed exceptions.
+  @override
+  Future<List<DeliveryException>> fetchExceptionHistory({
+    int limit = 20,
+    DeliveryException? startAfter,
+  }) async {
+    Query<Map<String, dynamic>> query = _h.exceptions
+        .where('status', whereIn: [
+          ExceptionStatus.rescheduled.name,
+          ExceptionStatus.reassigned.name,
+          ExceptionStatus.rto.name,
+          ExceptionStatus.resolved.name,
+        ]);
+
+    if (startAfter != null) {
+      final startDoc = await _h.exceptions.doc(startAfter.id).get();
+      if (startDoc.exists) {
+        query = query.startAfterDocument(startDoc);
+      }
+    }
+
+    final snap = await query.get(const GetOptions(source: Source.serverAndCache));
+    final list = snap.docs.map((d) => DeliveryException.fromMap(d.data())).toList();
+    list.sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+    return list.take(limit).toList();
+  }
 
   @override
   Future<void> report(DeliveryException exception, String byUid) async {
